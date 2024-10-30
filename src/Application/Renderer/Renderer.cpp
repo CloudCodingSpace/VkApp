@@ -1,8 +1,8 @@
 #include "Renderer.h"
 
-Renderer::Renderer()
+Renderer::Renderer(Window& window)
 {
-	VkCtxHelper::InitCtx(m_Ctx);
+	VkCtxHelper::InitCtx(m_Ctx, window);
 }
 
 Renderer::~Renderer()

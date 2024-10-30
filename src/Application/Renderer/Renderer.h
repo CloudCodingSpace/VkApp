@@ -5,7 +5,7 @@
 class Renderer
 {
 public:
-	Renderer();
+	Renderer(Window& window);
 	~Renderer();
 
 	void Render();

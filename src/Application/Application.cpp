@@ -3,6 +3,7 @@
 Application::Application()
 {
 	m_Window = new Window(800, 600, "An Appliation using Vulkan");
+	m_Renderer = new Renderer(*m_Window);
 }
 
 Application::~Application()
