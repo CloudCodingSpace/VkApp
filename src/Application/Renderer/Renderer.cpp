@@ -2,12 +2,13 @@
 
 Renderer::Renderer(Window& window)
 {
-	VkCtxHelper::InitCtx(m_Ctx, window);
+	VkCtxHandler::SetCrntCtx(m_Ctx);
+	VkCtxHandler::InitCtx(window);
 }
 
 Renderer::~Renderer()
 {
-	VkCtxHelper::DestroyCtx(m_Ctx);
+	VkCtxHandler::DestroyCtx();
 }
 
 void Renderer::Render()

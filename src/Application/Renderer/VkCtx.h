@@ -6,12 +6,18 @@
 
 struct VkCtx
 {
-	VkInstance instance;
+	VkInstance instance = VK_NULL_HANDLE;
+#if defined(_DEBUG) || !defined(N_DEBUG)
+	VkDebugUtilsMessengerEXT debugger;
+#endif
 };
 
-class VkCtxHelper
+class VkCtxHandler
 {
 public:
-	static void InitCtx(VkCtx& ctx, Window& window);
-	static void DestroyCtx(VkCtx& ctx);
+	static void InitCtx(Window& window);
+	static void DestroyCtx();
+
+	static void SetCrntCtx(VkCtx& ctx);
+	static VkCtx* GetCrntCtx();
 };
