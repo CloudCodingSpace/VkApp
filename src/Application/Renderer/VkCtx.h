@@ -7,6 +7,7 @@
 struct VkCtx
 {
 	VkInstance instance = VK_NULL_HANDLE;
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 #if defined(_DEBUG) || !defined(N_DEBUG)
 	VkDebugUtilsMessengerEXT debugger;
 #endif

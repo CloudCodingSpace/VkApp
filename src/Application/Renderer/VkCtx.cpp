@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <vector>
 #include <cstring>
+#include <iostream>
 
 static VkCtx* s_Ctx;
 
@@ -25,8 +26,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
 		ERROR("From the validation layer :- %s", pCallbackData->pMessage);
 		break;
 	default:
-		ERROR("From the validation layer :- %s", pCallbackData->pMessage);
-		break;
+		std::cerr << "From the validation layer :- " << pCallbackData->pMessage << "\n\n";
 	}
 
 	return VK_FALSE;
@@ -42,6 +42,7 @@ void VkCtxHandler::InitCtx(Window& window)
 	};
 
 #if defined(_DEBUG) || !defined(NDEBUG)
+
 	// Checking if validation layers are supported
 	{
 		bool isSupported = [&, layers]() {
@@ -67,12 +68,13 @@ void VkCtxHandler::InitCtx(Window& window)
 				return true;
 
 			return true;
-		} ();
+			} ();
 
-		if(!isSupported)
-			FATAL("Validation layers are not supported!")
+			if (!isSupported)
+				FATAL("Validation layers are not supported!")
 	}
 #endif
+
 	// Creating Instance
 	{
 		VkApplicationInfo appInfo{};
@@ -103,10 +105,12 @@ void VkCtxHandler::InitCtx(Window& window)
 
 		info.enabledExtensionCount = (uint32_t)exts.size();
 		info.ppEnabledExtensionNames = exts.data();
-		
+
 		VK_CHECK(vkCreateInstance(&info, nullptr, &s_Ctx->instance))
 	}
+
 #if defined(_DEBUG) || !defined(NDEBUG)
+
 	// Creating the debug messenger
 	{
 		VkDebugUtilsMessengerCreateInfoEXT info{};
@@ -115,7 +119,7 @@ void VkCtxHandler::InitCtx(Window& window)
 		info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		info.pfnUserCallback = DebugMessengerCallback;
 
-		auto createFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Ctx->instance, "vkCreateDebugUtilsMesengerEXT");
+		auto createFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Ctx->instance, "vkCreateDebugUtilsMessengerEXT");
 		if (createFunc)
 			createFunc(s_Ctx->instance, &info, nullptr, &s_Ctx->debugger);
 	}
@@ -128,7 +132,7 @@ void VkCtxHandler::DestroyCtx()
 		FATAL("There is no current Vulkan Backend Context! File: %s, Line: %d", __FILE__, __LINE__)
 
 #if defined(_DEBUG) || !defined(NDEBUG)
-	auto destroyFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Ctx->instance, "vkDestroyDebugUtilsMesengerEXT");
+	auto destroyFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Ctx->instance, "vkDestroyDebugUtilsMessengerEXT");
 	if (destroyFunc)
 		destroyFunc(s_Ctx->instance, s_Ctx->debugger, nullptr);
 #endif
