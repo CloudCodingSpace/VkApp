@@ -136,27 +136,27 @@ void VkCtxHandler::InitCtx(Window& window)
 	}
 #endif
 	
-	//// Selecting a suitable physical device
-	//{
-	//	uint32_t count = 0;
-	//	vkEnumeratePhysicalDevices(s_Ctx->instance, &count, nullptr);
-	//	std::vector<VkPhysicalDevice> devices(count);
-	//	vkEnumeratePhysicalDevices(s_Ctx->instance, &count, devices.data());
+	// Selecting a suitable physical device
+	{
+		uint32_t count = 0;
+		vkEnumeratePhysicalDevices(s_Ctx->instance, &count, nullptr);
+		std::vector<VkPhysicalDevice> devices(count);
+		vkEnumeratePhysicalDevices(s_Ctx->instance, &count, devices.data());
 
-	//	if (!count)
-	//		FATAL("Failed to find any device on the current PC!")
+		if (!count)
+			FATAL("Failed to find any device on the current PC!")
 
-	//	for (auto& device : devices)
-	//	{
-	//		bool supported = IsPhysicalDeviceUsable(device);
+		for (auto& device : devices)
+		{
+			bool supported = IsPhysicalDeviceUsable(device);
 
-	//		if (supported)
-	//		{
-	//			s_Ctx->physicalDevice = device;
-	//			break;
-	//		}
-	//	}
-	//}
+			if (supported)
+			{
+				s_Ctx->physicalDevice = device;
+				break;
+			}
+		}
+	}
 }
 
 void VkCtxHandler::DestroyCtx()
