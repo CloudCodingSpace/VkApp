@@ -1,6 +1,6 @@
 @echo off
 
 pushd ..
-libs\bin\premake5.exe vs2022
+libs\premake\premake5.exe vs2022
 popd
 pause
