@@ -1,5 +1,7 @@
 .vs
 *.filters
 *.user
-x64
-x84
+*.sln
+*.vcxproj
+bin
+bin-int
