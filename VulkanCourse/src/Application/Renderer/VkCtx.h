@@ -4,6 +4,7 @@
 
 #include <Window/Window.h>
 #include <limits>
+#include <vector>
 
 struct VulkanQueueFamilyProps
 {
@@ -14,6 +15,13 @@ struct VulkanQueueFamilyProps
 	inline bool IsFull() {
 		return pQueueIdx != std::numeric_limits<uint32_t>::max() && gQueueIdx != std::numeric_limits<uint32_t>::max() && tQueueIdx != std::numeric_limits<uint32_t>::max();
 	}
+};
+
+struct VulkanScCaps
+{
+	VkSurfaceCapabilitiesKHR caps;
+	std::vector<VkPresentModeKHR> modes;
+	std::vector<VkSurfaceFormatKHR> formats;
 };
 
 
@@ -27,8 +35,13 @@ struct VkCtx
 	VkQueue pQueue = VK_NULL_HANDLE;
 	VkQueue tQueue = VK_NULL_HANDLE;
 	VkDevice device = VK_NULL_HANDLE;
+	VulkanScCaps scCaps{};
+	VkExtent2D scExtent;
+	VkPresentModeKHR scMode;
+	VkSurfaceFormatKHR scFormat;
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
-#if defined(_DEBUG) || !defined(N_DEBUG)
+#if defined(_DEBUG) || !defined(NDEBUG)
 	VkDebugUtilsMessengerEXT debugger;
 #endif
 };

@@ -2,10 +2,11 @@
 #include <Utility.h>
 
 #include <stdexcept>
-#include <vector>
 #include <cstring>
 #include <iostream>
 #include <set>
+
+#include <glm/glm.hpp>
 
 static VkCtx* s_Ctx;
 
@@ -18,10 +19,11 @@ static std::vector<const char*> deviceExts = {
 };
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT messageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData) {
+			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+			VkDebugUtilsMessageTypeFlagsEXT messageType,
+			const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+			void* pUserData)
+{
 
 	std::string msg = pCallbackData->pMessage;
 	switch (messageSeverity)
@@ -91,6 +93,80 @@ static bool IsPhysicalDeviceUsable(VkPhysicalDevice& device)
 	} ();
 
 	return queuePresent && deviceExtsSupported;
+}
+
+static void GetScCaps()
+{
+	VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(s_Ctx->physicalDevice, s_Ctx->surface, &s_Ctx->scCaps.caps))
+
+	uint32_t formatCount = 0;
+	VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(s_Ctx->physicalDevice, s_Ctx->surface, &formatCount, nullptr))
+	if (formatCount)
+	{
+		s_Ctx->scCaps.formats.resize(formatCount);
+		VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(s_Ctx->physicalDevice, s_Ctx->surface, &formatCount, s_Ctx->scCaps.formats.data()))
+	}
+	
+	uint32_t modeCount = 0;
+	VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(s_Ctx->physicalDevice, s_Ctx->surface, &modeCount, nullptr))
+	if (modeCount)
+	{
+		s_Ctx->scCaps.modes.resize(modeCount);
+		VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(s_Ctx->physicalDevice, s_Ctx->surface, &modeCount, s_Ctx->scCaps.modes.data()))
+	}
+}
+
+static void SelectScProps(Window& window)
+{
+	// Selecting the present mode
+	{
+		bool set = false;
+		for (const auto& mode : s_Ctx->scCaps.modes)
+		{
+			if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
+				s_Ctx->scMode = mode;
+				set = true;
+				break;
+			}
+		}
+
+		if (!set)
+			s_Ctx->scMode = VK_PRESENT_MODE_FIFO_KHR;
+	}
+	// Selecting the surface format
+	{
+		bool set = false;
+		for (const auto& format : s_Ctx->scCaps.formats)
+		{
+			if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
+			{
+				s_Ctx->scFormat = format;
+				set = true;
+				break;
+			}
+		}
+		if (!set)
+			s_Ctx->scFormat = s_Ctx->scCaps.formats[0];
+	}
+	// Selecting the extent
+	{
+		if (s_Ctx->scCaps.caps.currentExtent.width != std::numeric_limits<uint32_t>::max())
+			s_Ctx->scExtent = s_Ctx->scCaps.caps.currentExtent;
+		else
+		{
+			int width, height;
+			glfwGetFramebufferSize(window.GetInternHandle(), &width, &height);
+
+			s_Ctx->scExtent = {
+				static_cast<uint32_t>(width),
+				static_cast<uint32_t>(height)
+			};
+
+			s_Ctx->scExtent.width = glm::clamp(s_Ctx->scExtent.width, s_Ctx->scCaps.caps.minImageExtent.width, s_Ctx->scCaps.caps.maxImageExtent.width);
+			s_Ctx->scExtent.height = glm::clamp(s_Ctx->scExtent.height, s_Ctx->scCaps.caps.minImageExtent.height, s_Ctx->scCaps.caps.maxImageExtent.height);
+		}
+	}
 }
 
 void VkCtxHandler::InitCtx(Window& window)
@@ -253,6 +329,60 @@ void VkCtxHandler::InitCtx(Window& window)
 
 		VK_CHECK(vkCreateDevice(s_Ctx->physicalDevice, &info, nullptr, &s_Ctx->device))
 	}
+	// Retrieving queue objects 
+	{
+		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.gQueueIdx, 0, &s_Ctx->gQueue);
+		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.pQueueIdx, 0, &s_Ctx->pQueue);
+		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.tQueueIdx, 0, &s_Ctx->tQueue);
+	}
+	
+	GetScCaps(); // Retrieving the various surface's rendering capabilities
+	SelectScProps(window); // Selecting the most appropriate present modes, formats, extent for the swapchain
+
+	// Creating the swapchain
+	{
+		auto caps = s_Ctx->scCaps.caps;
+
+		uint32_t imgCount = caps.minImageCount + 1;
+		if (caps.maxImageCount > 0 && imgCount > caps.maxImageCount)
+		{
+			imgCount = caps.maxImageCount;
+		}
+
+		VkSwapchainCreateInfoKHR info{};
+		info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		info.surface = s_Ctx->surface;
+		info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+		info.minImageCount = imgCount;
+		info.imageFormat = s_Ctx->scFormat.format;
+		info.imageColorSpace = s_Ctx->scFormat.colorSpace;
+		info.preTransform = caps.currentTransform;
+		info.presentMode = s_Ctx->scMode;
+		info.imageArrayLayers = 1;
+		info.imageExtent = s_Ctx->scExtent;
+		info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		info.clipped = VK_TRUE;
+		info.oldSwapchain = VK_NULL_HANDLE;
+
+		uint32_t familiesIdxs[] = {
+			s_Ctx->queueProps.gQueueIdx,
+			s_Ctx->queueProps.pQueueIdx,
+			s_Ctx->queueProps.tQueueIdx
+		};
+
+		if (familiesIdxs[0] != familiesIdxs[1] || familiesIdxs[1] != familiesIdxs[2] || familiesIdxs[0] != familiesIdxs[2])
+		{
+			info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			info.queueFamilyIndexCount = 3;
+			info.pQueueFamilyIndices = familiesIdxs;
+		}
+		else
+		{
+			info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		}
+
+		VK_CHECK(vkCreateSwapchainKHR(s_Ctx->device, &info, nullptr, &s_Ctx->swapchain))
+	}
 }
 
 void VkCtxHandler::DestroyCtx()
@@ -264,6 +394,7 @@ void VkCtxHandler::DestroyCtx()
 		FATAL(msg)
 	}
 
+	vkDestroySwapchainKHR(s_Ctx->device, s_Ctx->swapchain, nullptr);
 	vkDestroyDevice(s_Ctx->device, nullptr);
 	vkDestroySurfaceKHR(s_Ctx->instance, s_Ctx->surface, nullptr);
 
