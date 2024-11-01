@@ -5,8 +5,17 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
+#include <set>
 
 static VkCtx* s_Ctx;
+
+static std::vector<const char*> layers = {
+	"VK_LAYER_KHRONOS_validation"
+};
+
+static std::vector<const char*> deviceExts = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -65,7 +74,23 @@ static bool IsPhysicalDeviceUsable(VkPhysicalDevice& device)
 		return false;
 	} ();
 
-	return queuePresent;
+	bool deviceExtsSupported = [&]() {
+		uint32_t extensionCount;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+		
+		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+		
+		std::set<std::string> requiredExtensions(deviceExts.begin(), deviceExts.end());
+		
+		for (const auto& extension : availableExtensions) {
+			requiredExtensions.erase(extension.extensionName);
+		}
+		
+		return requiredExtensions.empty();
+	} ();
+
+	return queuePresent && deviceExtsSupported;
 }
 
 void VkCtxHandler::InitCtx(Window& window)
@@ -77,15 +102,11 @@ void VkCtxHandler::InitCtx(Window& window)
 		FATAL(msg)
 	}
 
-	std::vector<const char*> layers = {
-		"VK_LAYER_KHRONOS_validation"
-	};
-
 #if defined(_DEBUG) || !defined(NDEBUG)
 
 	// Checking if validation layers are supported
 	{
-		bool isSupported = [&, layers]() {
+		bool isSupported = [&]() {
 			uint32_t lyrCount = 0;
 			vkEnumerateInstanceLayerProperties(&lyrCount, nullptr);
 			std::vector<VkLayerProperties> props(lyrCount);
@@ -221,7 +242,8 @@ void VkCtxHandler::InitCtx(Window& window)
 		info.pEnabledFeatures = &features;
 		info.queueCreateInfoCount = 3;
 		info.pQueueCreateInfos = qInfo;
-		info.enabledExtensionCount = 0;
+		info.enabledExtensionCount = (uint32_t)deviceExts.size();
+		info.ppEnabledExtensionNames = deviceExts.data();
 		info.enabledLayerCount = 0;
 
 #if defined(_DEBUG) || !defined(NDEBUG)
