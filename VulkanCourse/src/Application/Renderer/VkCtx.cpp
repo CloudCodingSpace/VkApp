@@ -14,16 +14,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData) {
 
+	std::string msg = pCallbackData->pMessage;
 	switch (messageSeverity)
 	{
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-		INFO("From the validation layer :- %s", pCallbackData->pMessage);
+		INFO(("From the validation layer :- " + msg));
 		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-		WARN("From the validation layer :- %s", pCallbackData->pMessage);
+		WARN(("From the validation layer :- " + msg));
 		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-		ERROR("From the validation layer :- %s", pCallbackData->pMessage);
+		ERROR(("From the validation layer :- " + msg));
 		break;
 	default:
 		std::cerr << "From the validation layer :- " << pCallbackData->pMessage << "\n\n";
@@ -70,7 +71,11 @@ static bool IsPhysicalDeviceUsable(VkPhysicalDevice& device)
 void VkCtxHandler::InitCtx(Window& window)
 {
 	if (!s_Ctx)
-		FATAL("There is no current Vulkan Backend Context! File: %s, Line: %d", __FILE__, __LINE__)
+	{
+		std::string fileName = __FILE__;
+		std::string msg = "There is no current Vulkan Backend Context! (File: " + fileName + ", Line: " + std::to_string(__LINE__) + ")";
+		FATAL(msg)
+	}
 
 	std::vector<const char*> layers = {
 		"VK_LAYER_KHRONOS_validation"
@@ -186,13 +191,58 @@ void VkCtxHandler::InitCtx(Window& window)
 			}
 		}
 	}
+
+	// Creating the logical device
+	{
+		VkPhysicalDeviceFeatures features{};
+		vkGetPhysicalDeviceFeatures(s_Ctx->physicalDevice, &features);
+
+		float qPriority = 1.0f;
+		VkDeviceQueueCreateInfo qInfo[3];
+		uint32_t familiesIdxs[] = {
+			s_Ctx->queueProps.gQueueIdx,
+			s_Ctx->queueProps.pQueueIdx,
+			s_Ctx->queueProps.tQueueIdx
+		};
+
+		for (int i = 0; i < 3; i++)
+		{
+			VkDeviceQueueCreateInfo info{};
+			info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			info.pQueuePriorities = &qPriority;
+			info.queueCount = 1;
+			info.queueFamilyIndex = familiesIdxs[i];
+
+			qInfo[i] = info;
+		}
+
+		VkDeviceCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		info.pEnabledFeatures = &features;
+		info.queueCreateInfoCount = 3;
+		info.pQueueCreateInfos = qInfo;
+		info.enabledExtensionCount = 0;
+		info.enabledLayerCount = 0;
+
+#if defined(_DEBUG) || !defined(NDEBUG)
+		info.enabledLayerCount = (uint32_t)layers.size();
+		info.ppEnabledLayerNames = layers.data();
+#endif
+
+		VK_CHECK(vkCreateDevice(s_Ctx->physicalDevice, &info, nullptr, &s_Ctx->device))
+	}
 }
 
 void VkCtxHandler::DestroyCtx()
 {
 	if (!s_Ctx)
-		FATAL("There is no current Vulkan Backend Context! File: %s, Line: %d", __FILE__, __LINE__)
+	{
+		std::string fileName = __FILE__;
+		std::string msg = "There is no current Vulkan Backend Context! (File: " + fileName + ", Line: " + std::to_string(__LINE__) + ")";
+		FATAL(msg)
+	}
 
+	vkDestroyDevice(s_Ctx->device, nullptr);
 	vkDestroySurfaceKHR(s_Ctx->instance, s_Ctx->surface, nullptr);
 
 #if defined(_DEBUG) || !defined(NDEBUG)

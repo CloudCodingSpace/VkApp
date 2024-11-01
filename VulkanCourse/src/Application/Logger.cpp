@@ -1,43 +1,34 @@
 #include "Logger.h"
 
-void log_output(log_severity severity, const char* msg, ...)
+void log_output(log_severity severity, std::string msg)
 {
-    char* mssage = NULL;
-    char buff[32000];
-    va_list list;
-
-    va_start(list, msg);
-    vsprintf(buff, msg, list);
-    va_end(list);
-
-    if (severity == LOG_SEVERITY_TRACE) {
-        char message[] = "[TRACE] ";
-        mssage = message;
-    }
-    else if (severity == LOG_SEVERITY_INFO) {
-        char message[] = "[INFO] ";
-        mssage = message;
-    }
-    else if (severity == LOG_SEVERITY_DEBUG) {
-        char message[] = "[DEBUG] ";
-        mssage = message;
-    }
-    else if (severity == LOG_SEVERITY_WARN) {
-        char message[] = "[WARN] ";
-        mssage = message;
-    }
-    else if (severity == LOG_SEVERITY_ERROR) {
-        char message[] = "[ERROR] ";
-        mssage = message;
-    }
-    else if (severity == LOG_SEVERITY_FATAL) {
-        char message[] = "[FATAL] ";
-        mssage = message;
+    std::string message = "[VulkanApplication] ";
+    switch (severity) {
+    case LOG_SEVERITY_INFO:
+        printf("\033[0;32m");
+        message += "INFO: ";
+        break;
+    case LOG_SEVERITY_WARN:
+        printf("\033[0;33m");
+        message += "WARN: ";
+        break;
+#ifdef _DEBUG
+    case LOG_SEVERITY_DEBUG:
+        printf("\033[0;34m");
+        message += "DEBUG: ";
+        break;
+#endif
+    case LOG_SEVERITY_ERROR:
+        printf("\033[1;31m");
+        message += "ERROR: ";
+        break;
+    case LOG_SEVERITY_FATAL:
+        printf("\033[0;31m");
+        message += "FATAL: ";
+        break;
     }
 
-    strcat(mssage, buff);
-    printf("%s\n", mssage);
-
-    if (severity == LOG_SEVERITY_FATAL || severity == LOG_SEVERITY_ERROR)
-        exit(EXIT_FAILURE);
+    message += msg;
+    printf("%s\n", message.c_str());
+    printf("\033[0;0m"); // Resetting the terminal color
 }

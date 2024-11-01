@@ -26,6 +26,7 @@ struct VkCtx
 	VkQueue gQueue = VK_NULL_HANDLE;
 	VkQueue pQueue = VK_NULL_HANDLE;
 	VkQueue tQueue = VK_NULL_HANDLE;
+	VkDevice device = VK_NULL_HANDLE;
 
 #if defined(_DEBUG) || !defined(N_DEBUG)
 	VkDebugUtilsMessengerEXT debugger;

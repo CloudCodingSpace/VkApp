@@ -5,12 +5,13 @@
 
 #include "Logger.h"
 
-void check_vk_result(VkResult result, uint32_t lineNum, const char* funcName, const char* fileName)
+void check_vk_result(VkResult result, uint32_t lineNum, std::string funcName, std::string fileName)
 {
     if (result != VK_SUCCESS)
     {
-        const char* msg = "VkResult is %s (line: %d, function: %s, file: %s)";
-        FATAL(msg, string_VkResult(result), lineNum, funcName, fileName);
+        std::string resultStr = string_VkResult(result);
+        std::string msg = "VkResult is " + resultStr + " (line: " + std::to_string(lineNum) + ", function: " + funcName + ", file: " + fileName + ")";
+        FATAL(msg);
     }
 }
 
