@@ -35,9 +35,33 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
 static bool IsPhysicalDeviceUsable(VkPhysicalDevice& device)
 {
 	bool queuePresent = [&]() {
+		uint32_t count = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, nullptr);
+		std::vector<VkQueueFamilyProperties> props(count);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, props.data());
 
+		int i = 0;
+		for (const auto& prop : props)
+		{
+			if (prop.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				s_Ctx->queueProps.gQueueIdx = i;
 
-		return true;
+			if (prop.queueFlags & VK_QUEUE_TRANSFER_BIT)
+				s_Ctx->queueProps.tQueueIdx = i;
+
+			VkBool32 presentSupport = VK_FALSE;
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, s_Ctx->surface, &presentSupport);
+
+			if (presentSupport)
+				s_Ctx->queueProps.pQueueIdx = i;
+
+			if (s_Ctx->queueProps.IsFull())
+				return true;
+
+			i++;
+		}
+
+		return false;
 	} ();
 
 	return queuePresent;
@@ -135,7 +159,12 @@ void VkCtxHandler::InitCtx(Window& window)
 			createFunc(s_Ctx->instance, &info, nullptr, &s_Ctx->debugger);
 	}
 #endif
-	
+
+	// Creating the window surface
+	{
+		VK_CHECK(glfwCreateWindowSurface(s_Ctx->instance, window.GetInternHandle(), nullptr, &s_Ctx->surface))
+	}
+
 	// Selecting a suitable physical device
 	{
 		uint32_t count = 0;
@@ -163,6 +192,8 @@ void VkCtxHandler::DestroyCtx()
 {
 	if (!s_Ctx)
 		FATAL("There is no current Vulkan Backend Context! File: %s, Line: %d", __FILE__, __LINE__)
+
+	vkDestroySurfaceKHR(s_Ctx->instance, s_Ctx->surface, nullptr);
 
 #if defined(_DEBUG) || !defined(NDEBUG)
 	auto destroyFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Ctx->instance, "vkDestroyDebugUtilsMessengerEXT");
