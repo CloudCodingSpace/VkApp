@@ -57,7 +57,6 @@ struct VkCtx
 	{
 		scImgs.clear();
 		scImgViews.clear();
-		scFramebuffs.clear();
 	}
 };
 
