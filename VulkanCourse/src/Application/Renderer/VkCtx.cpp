@@ -29,13 +29,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
 	switch (messageSeverity)
 	{
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-		INFO(("From the validation layer :- " + msg));
+		INFO(("From the validation layer :- " + msg + "\n\n"));
 		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-		WARN(("From the validation layer :- " + msg));
+		WARN(("From the validation layer :- " + msg + "\n\n"));
 		break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-		ERROR(("From the validation layer :- " + msg));
+		ERROR(("From the validation layer :- " + msg + "\n\n"));
 		break;
 	default:
 		std::cerr << "From the validation layer :- " << pCallbackData->pMessage << "\n\n";
@@ -78,10 +78,10 @@ static bool IsPhysicalDeviceUsable(VkPhysicalDevice& device)
 
 	bool deviceExtsSupported = [&]() {
 		uint32_t extensionCount;
-		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-		
+		VK_CHECK(vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr))
+
 		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+		VK_CHECK(vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data()))
 		
 		std::set<std::string> requiredExtensions(deviceExts.begin(), deviceExts.end());
 		
@@ -139,7 +139,7 @@ static void SelectScProps(Window& window)
 		bool set = false;
 		for (const auto& format : s_Ctx->scCaps.formats)
 		{
-			if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
+			if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
 			{
 				s_Ctx->scFormat = format;
 				set = true;
@@ -184,9 +184,9 @@ void VkCtxHandler::InitCtx(Window& window)
 	{
 		bool isSupported = [&]() {
 			uint32_t lyrCount = 0;
-			vkEnumerateInstanceLayerProperties(&lyrCount, nullptr);
+			VK_CHECK(vkEnumerateInstanceLayerProperties(&lyrCount, nullptr))
 			std::vector<VkLayerProperties> props(lyrCount);
-			vkEnumerateInstanceLayerProperties(&lyrCount, props.data());
+			VK_CHECK(vkEnumerateInstanceLayerProperties(&lyrCount, props.data()))
 
 			bool found = false;
 			for (const auto layer : layers)
@@ -205,10 +205,10 @@ void VkCtxHandler::InitCtx(Window& window)
 				return true;
 
 			return true;
-		} ();
+			} ();
 
-		if (!isSupported)
-			FATAL("Validation layers are not supported!")
+			if (!isSupported)
+				FATAL("Validation layers are not supported!")
 	}
 #endif
 
@@ -233,9 +233,16 @@ void VkCtxHandler::InitCtx(Window& window)
 			auto e = glfwGetRequiredInstanceExtensions(&extCount);
 			std::vector<const char*> es(e, extCount + e);
 #if defined(_DEBUG) || !defined(NDEBUG)
+			VkDebugUtilsMessengerCreateInfoEXT debinfo{};
+			debinfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+			debinfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+			debinfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+			debinfo.pfnUserCallback = DebugMessengerCallback;
+
 			es.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 			info.enabledLayerCount = (uint32_t)layers.size();
 			info.ppEnabledLayerNames = layers.data();
+			info.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debinfo;
 #endif
 			exts = es;
 		}
@@ -252,17 +259,17 @@ void VkCtxHandler::InitCtx(Window& window)
 	{
 		VkDebugUtilsMessengerCreateInfoEXT info{};
 		info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
-		info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		info.pfnUserCallback = DebugMessengerCallback;
 
 		auto createFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Ctx->instance, "vkCreateDebugUtilsMessengerEXT");
 		if (createFunc)
-			createFunc(s_Ctx->instance, &info, nullptr, &s_Ctx->debugger);
+			VK_CHECK(createFunc(s_Ctx->instance, &info, nullptr, &s_Ctx->debugger))
 	}
 #endif
 
-	// Creating the window surface
+		// Creating the window surface
 	{
 		VK_CHECK(glfwCreateWindowSurface(s_Ctx->instance, window.GetInternHandle(), nullptr, &s_Ctx->surface))
 	}
@@ -270,23 +277,23 @@ void VkCtxHandler::InitCtx(Window& window)
 	// Selecting a suitable physical device
 	{
 		uint32_t count = 0;
-		vkEnumeratePhysicalDevices(s_Ctx->instance, &count, nullptr);
+		VK_CHECK(vkEnumeratePhysicalDevices(s_Ctx->instance, &count, nullptr))
 		std::vector<VkPhysicalDevice> devices(count);
-		vkEnumeratePhysicalDevices(s_Ctx->instance, &count, devices.data());
+		VK_CHECK(vkEnumeratePhysicalDevices(s_Ctx->instance, &count, devices.data()))
 
 		if (!count)
 			FATAL("Failed to find any device on the current PC!")
 
-		for (auto& device : devices)
-		{
-			bool supported = IsPhysicalDeviceUsable(device);
-
-			if (supported)
+			for (auto& device : devices)
 			{
-				s_Ctx->physicalDevice = device;
-				break;
+				bool supported = IsPhysicalDeviceUsable(device);
+
+				if (supported)
+				{
+					s_Ctx->physicalDevice = device;
+					break;
+				}
 			}
-		}
 	}
 
 	// Creating the logical device
@@ -295,14 +302,26 @@ void VkCtxHandler::InitCtx(Window& window)
 		vkGetPhysicalDeviceFeatures(s_Ctx->physicalDevice, &features);
 
 		float qPriority = 1.0f;
-		VkDeviceQueueCreateInfo qInfo[3];
 		uint32_t familiesIdxs[] = {
 			s_Ctx->queueProps.gQueueIdx,
 			s_Ctx->queueProps.pQueueIdx,
 			s_Ctx->queueProps.tQueueIdx
 		};
 
-		for (int i = 0; i < 3; i++)
+		int loopCount = 3;
+		if (familiesIdxs[0] == familiesIdxs[1])
+			loopCount--;
+		if (familiesIdxs[1] == familiesIdxs[2])
+			loopCount--;
+		if (familiesIdxs[0] == familiesIdxs[2])
+			loopCount--;
+
+		if (loopCount == 0)
+			loopCount++;
+
+
+		std::vector<VkDeviceQueueCreateInfo> qInfo(loopCount);
+		for (int i = 0; i < loopCount; i++)
 		{
 			VkDeviceQueueCreateInfo info{};
 			info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -316,8 +335,8 @@ void VkCtxHandler::InitCtx(Window& window)
 		VkDeviceCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		info.pEnabledFeatures = &features;
-		info.queueCreateInfoCount = 3;
-		info.pQueueCreateInfos = qInfo;
+		info.queueCreateInfoCount = loopCount;
+		info.pQueueCreateInfos = qInfo.data();
 		info.enabledExtensionCount = (uint32_t)deviceExts.size();
 		info.ppEnabledExtensionNames = deviceExts.data();
 		info.enabledLayerCount = 0;
@@ -335,7 +354,7 @@ void VkCtxHandler::InitCtx(Window& window)
 		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.pQueueIdx, 0, &s_Ctx->pQueue);
 		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.tQueueIdx, 0, &s_Ctx->tQueue);
 	}
-	
+
 	GetScCaps(); // Retrieving the various surface's rendering capabilities
 	SelectScProps(window); // Selecting the most appropriate present modes, formats, extent for the swapchain
 
@@ -383,6 +402,41 @@ void VkCtxHandler::InitCtx(Window& window)
 
 		VK_CHECK(vkCreateSwapchainKHR(s_Ctx->device, &info, nullptr, &s_Ctx->swapchain))
 	}
+	// Retrieving the swapchain images
+	{
+		uint32_t count = 0;
+		VK_CHECK(vkGetSwapchainImagesKHR(s_Ctx->device, s_Ctx->swapchain, &count, nullptr))
+		s_Ctx->scImgs.resize(count);
+		VK_CHECK(vkGetSwapchainImagesKHR(s_Ctx->device, s_Ctx->swapchain, &count, s_Ctx->scImgs.data()))
+	}
+	// Creating the image views
+	{
+		s_Ctx->scImgViews.resize(s_Ctx->scImgs.size());
+		int i = 0;
+		for (const auto& img : s_Ctx->scImgs)
+		{
+			VkImageViewCreateInfo info{};
+			info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			info.image = img;
+			info.components = {
+				VK_COMPONENT_SWIZZLE_IDENTITY,
+				VK_COMPONENT_SWIZZLE_IDENTITY,
+				VK_COMPONENT_SWIZZLE_IDENTITY,
+				VK_COMPONENT_SWIZZLE_IDENTITY
+			};
+			info.format = s_Ctx->scFormat.format;
+			info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			info.subresourceRange.baseArrayLayer = 0;
+			info.subresourceRange.baseMipLevel = 0;
+			info.subresourceRange.layerCount = 1;
+			info.subresourceRange.levelCount = 1;
+
+			VK_CHECK(vkCreateImageView(s_Ctx->device, &info, nullptr, &s_Ctx->scImgViews[i]))
+
+			i++;
+		}
+	}
 }
 
 void VkCtxHandler::DestroyCtx()
@@ -392,6 +446,11 @@ void VkCtxHandler::DestroyCtx()
 		std::string fileName = __FILE__;
 		std::string msg = "There is no current Vulkan Backend Context! (File: " + fileName + ", Line: " + std::to_string(__LINE__) + ")";
 		FATAL(msg)
+	}
+
+	for (const auto& imgView : s_Ctx->scImgViews)
+	{
+		vkDestroyImageView(s_Ctx->device, imgView, nullptr);
 	}
 
 	vkDestroySwapchainKHR(s_Ctx->device, s_Ctx->swapchain, nullptr);

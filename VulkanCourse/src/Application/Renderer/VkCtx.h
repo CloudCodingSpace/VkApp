@@ -22,6 +22,12 @@ struct VulkanScCaps
 	VkSurfaceCapabilitiesKHR caps;
 	std::vector<VkPresentModeKHR> modes;
 	std::vector<VkSurfaceFormatKHR> formats;
+
+	~VulkanScCaps()
+	{
+		modes.clear();
+		formats.clear();
+	}
 };
 
 
@@ -40,10 +46,19 @@ struct VkCtx
 	VkPresentModeKHR scMode;
 	VkSurfaceFormatKHR scFormat;
 	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+	std::vector<VkImage> scImgs;
+	std::vector<VkImageView> scImgViews;
 
 #if defined(_DEBUG) || !defined(NDEBUG)
 	VkDebugUtilsMessengerEXT debugger;
 #endif
+
+	~VkCtx()
+	{
+		scImgs.clear();
+		scImgViews.clear();
+		scFramebuffs.clear();
+	}
 };
 
 class VkCtxHandler
