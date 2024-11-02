@@ -68,4 +68,6 @@ public:
 
 	static void SetCrntCtx(VkCtx& ctx);
 	static VkCtx* GetCrntCtx();
+private:
+	static void CheckCrntCtx(std::string funcName, int lineNum);
 };

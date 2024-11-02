@@ -171,12 +171,7 @@ static void SelectScProps(Window& window)
 
 void VkCtxHandler::InitCtx(Window& window)
 {
-	if (!s_Ctx)
-	{
-		std::string fileName = __FILE__;
-		std::string msg = "There is no current Vulkan Backend Context! (File: " + fileName + ", Line: " + std::to_string(__LINE__) + ")";
-		FATAL(msg)
-	}
+	CheckCrntCtx(__func__, __LINE__);
 
 #if defined(_DEBUG) || !defined(NDEBUG)
 
@@ -441,12 +436,7 @@ void VkCtxHandler::InitCtx(Window& window)
 
 void VkCtxHandler::DestroyCtx()
 {
-	if (!s_Ctx)
-	{
-		std::string fileName = __FILE__;
-		std::string msg = "There is no current Vulkan Backend Context! (File: " + fileName + ", Line: " + std::to_string(__LINE__) + ")";
-		FATAL(msg)
-	}
+	CheckCrntCtx(__func__, __LINE__);
 
 	for (const auto& imgView : s_Ctx->scImgViews)
 	{
@@ -474,4 +464,14 @@ void VkCtxHandler::SetCrntCtx(VkCtx& ctx)
 VkCtx* VkCtxHandler::GetCrntCtx()
 {
 	return s_Ctx;
+}
+
+void VkCtxHandler::CheckCrntCtx(std::string funcName, int lineNum)
+{
+	if (!s_Ctx)
+	{
+		std::string fileName = __FILE__;
+		std::string msg = "There is no current Vulkan Backend Context! (File: " + fileName + ", Line: " + std::to_string(lineNum) + ", Function: " + funcName + " )";
+		FATAL(msg)
+	}
 }

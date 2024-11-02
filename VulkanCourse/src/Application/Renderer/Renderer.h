@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VkCtx.h"
+#include "VulkanRenderpass.h"
 
 class Renderer
 {
@@ -13,4 +14,5 @@ public:
 
 private:
 	VkCtx m_Ctx{};
+	VulkanRenderpass m_Pass;
 };

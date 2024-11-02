@@ -5,7 +5,7 @@
 
 #include "Logger.h"
 
-void check_vk_result(VkResult result, uint32_t lineNum, std::string funcName, std::string fileName)
+inline void check_vk_result(VkResult result, uint32_t lineNum, std::string funcName, std::string fileName)
 {
     if (result != VK_SUCCESS)
     {
