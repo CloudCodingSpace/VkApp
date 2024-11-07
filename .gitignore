@@ -5,3 +5,4 @@
 *.vcxproj
 bin
 bin-int
+Makefile

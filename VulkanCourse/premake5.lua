@@ -22,12 +22,16 @@ project "VulkanCourse"
       "%{IncludeDir.glm}",
     }
 
+    libdirs
+    {
+        "%{LibraryDir.VulkanSDK}"
+    }
+
     links
     {
         "GLFW",
         "TinyOBJ",
-        "STB",
-        "%{Library.Vulkan}"
+        "STB"
     }
 
     defines
@@ -37,6 +41,21 @@ project "VulkanCourse"
     
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
     objdir ("../bin-int/" .. outputdir .. "/%{prj.name}")
+
+    filter "action:vs2022"
+        links 
+        {
+            "vulkan-1.lib"
+        }
+
+    filter "action:gmake or action:gmake2"
+        filter "system:windows"
+            links { "gdi32", "user32", "shell32" }
+
+        links
+        {
+            "vulkan-1"
+        }
 
     filter "system:windows"
         systemversion "latest"

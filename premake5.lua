@@ -1,12 +1,4 @@
--- PremakeConfig
-workspace "VulkanCourse"
-    architecture"x64"
-    startproject "VulkanCourse"
-    configurations { 
-            "Debug",
-            "Release"
-    }
-
+-- Predefined global vars
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 VULKAN_SDK = os.getenv("VULKAN_SDK")
 
@@ -17,8 +9,16 @@ IncludeDir["glm"] = "../libs/glm"
 LibraryDir = {}
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 
-Library = {}
-Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
+-- The config
+workspace "VulkanCourse"
+    architecture"x64"
+    startproject "VulkanCourse"
+    configurations { 
+            "Debug",
+            "Release"
+    }
+
+
 
 group "libs"
    include "libs/tinyobj"
