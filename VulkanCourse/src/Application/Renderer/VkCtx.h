@@ -8,12 +8,12 @@
 
 struct VulkanQueueFamilyProps
 {
-	uint32_t pQueueIdx = std::numeric_limits<uint32_t>::max();
-	uint32_t tQueueIdx = std::numeric_limits<uint32_t>::max();
-	uint32_t gQueueIdx = std::numeric_limits<uint32_t>::max();
+	uint32_t presentQueueIdx = std::numeric_limits<uint32_t>::max();
+	uint32_t transferQueueIdx = std::numeric_limits<uint32_t>::max();
+	uint32_t graphicsQueueIdx = std::numeric_limits<uint32_t>::max();
 
 	inline bool IsFull() {
-		return pQueueIdx != std::numeric_limits<uint32_t>::max() && gQueueIdx != std::numeric_limits<uint32_t>::max() && tQueueIdx != std::numeric_limits<uint32_t>::max();
+		return presentQueueIdx != std::numeric_limits<uint32_t>::max() && graphicsQueueIdx != std::numeric_limits<uint32_t>::max() && transferQueueIdx != std::numeric_limits<uint32_t>::max();
 	}
 };
 

@@ -1,5 +1,5 @@
 #include "VkCtx.h"
-#include <Utility.h>
+#include "Global.h"
 
 #include <stdexcept>
 #include <cstring>
@@ -56,16 +56,16 @@ static bool IsPhysicalDeviceUsable(VkPhysicalDevice& device)
 		for (const auto& prop : props)
 		{
 			if (prop.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-				s_Ctx->queueProps.gQueueIdx = i;
+				s_Ctx->queueProps.graphicsQueueIdx = i;
 
 			if (prop.queueFlags & VK_QUEUE_TRANSFER_BIT)
-				s_Ctx->queueProps.tQueueIdx = i;
+				s_Ctx->queueProps.transferQueueIdx = i;
 
 			VkBool32 presentSupport = VK_FALSE;
 			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, s_Ctx->surface, &presentSupport);
 
 			if (presentSupport)
-				s_Ctx->queueProps.pQueueIdx = i;
+				s_Ctx->queueProps.presentQueueIdx = i;
 
 			if (s_Ctx->queueProps.IsFull())
 				return true;
@@ -298,9 +298,9 @@ void VkCtxHandler::InitCtx(Window& window)
 
 		float qPriority = 1.0f;
 		uint32_t familiesIdxs[] = {
-			s_Ctx->queueProps.gQueueIdx,
-			s_Ctx->queueProps.pQueueIdx,
-			s_Ctx->queueProps.tQueueIdx
+			s_Ctx->queueProps.graphicsQueueIdx,
+			s_Ctx->queueProps.presentQueueIdx,
+			s_Ctx->queueProps.transferQueueIdx
 		};
 
 		int loopCount = 3;
@@ -345,9 +345,9 @@ void VkCtxHandler::InitCtx(Window& window)
 	}
 	// Retrieving queue objects 
 	{
-		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.gQueueIdx, 0, &s_Ctx->gQueue);
-		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.pQueueIdx, 0, &s_Ctx->pQueue);
-		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.tQueueIdx, 0, &s_Ctx->tQueue);
+		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.graphicsQueueIdx, 0, &s_Ctx->gQueue);
+		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.presentQueueIdx, 0, &s_Ctx->pQueue);
+		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.transferQueueIdx, 0, &s_Ctx->tQueue);
 	}
 
 	GetScCaps(); // Retrieving the various surface's rendering capabilities
@@ -379,9 +379,9 @@ void VkCtxHandler::InitCtx(Window& window)
 		info.oldSwapchain = VK_NULL_HANDLE;
 
 		uint32_t familiesIdxs[] = {
-			s_Ctx->queueProps.gQueueIdx,
-			s_Ctx->queueProps.pQueueIdx,
-			s_Ctx->queueProps.tQueueIdx
+			s_Ctx->queueProps.graphicsQueueIdx,
+			s_Ctx->queueProps.presentQueueIdx,
+			s_Ctx->queueProps.transferQueueIdx
 		};
 
 		if (familiesIdxs[0] != familiesIdxs[1] || familiesIdxs[1] != familiesIdxs[2] || familiesIdxs[0] != familiesIdxs[2])

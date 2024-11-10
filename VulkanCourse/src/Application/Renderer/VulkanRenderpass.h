@@ -1,7 +1,7 @@
 #pragma once
 
 #include "VkCtx.h"
-#include <Utility.h>
+#include "Global.h"
 
 enum VulkanRenderpassFlags
 {
