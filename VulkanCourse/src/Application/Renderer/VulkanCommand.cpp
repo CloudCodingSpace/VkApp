@@ -3,7 +3,7 @@
 #include "VkCtx.h"
 #include "Logger.h"
 
-VulkanCommandPool& VulkanCommandPool::Create(VulkanCmdPoolInputData data)
+VulkanCommandPool VulkanCommandPool::Create(VulkanCmdPoolInputData data)
 {
     VulkanCommandPool pool;
     VkCtx* ctx = VkCtxHandler::GetCrntCtx();
@@ -17,6 +17,8 @@ VulkanCommandPool& VulkanCommandPool::Create(VulkanCmdPoolInputData data)
     info.flags = data.flags;
 
     VK_CHECK(vkCreateCommandPool(ctx->device, &info, nullptr, &pool.m_Handle))
+
+    return pool;
 }
 
 void VulkanCommandPool::Destroy()
@@ -25,7 +27,7 @@ void VulkanCommandPool::Destroy()
     vkDestroyCommandPool(ctx->device, m_Handle, nullptr);
 }
 
-VulkanCmdBuffer& VulkanCmdBuffer::Allocate(VulkanCmdBufferInputData data)
+VulkanCmdBuffer VulkanCmdBuffer::Allocate(VulkanCmdBufferInputData data)
 {
     VkCtx* ctx = VkCtxHandler::GetCrntCtx();
     VulkanCmdBuffer buff{};

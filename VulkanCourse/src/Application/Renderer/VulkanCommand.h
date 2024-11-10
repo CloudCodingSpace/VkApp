@@ -13,7 +13,7 @@ struct VulkanCmdPoolInputData
 class VulkanCommandPool
 {
 public:
-    static VulkanCommandPool& Create(VulkanCmdPoolInputData data);
+    static VulkanCommandPool Create(VulkanCmdPoolInputData data);
     void Destroy();
 
     inline VkCommandPool GetHandle() const { return m_Handle; }
@@ -30,7 +30,7 @@ struct VulkanCmdBufferInputData
 class VulkanCmdBuffer
 {
 public:
-    static VulkanCmdBuffer& Allocate(VulkanCmdBufferInputData data);
+    static VulkanCmdBuffer Allocate(VulkanCmdBufferInputData data);
     void Free();
 
     inline VkCommandBuffer GetHandle() const { return m_Handle; }
