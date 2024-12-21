@@ -18,7 +18,7 @@ public:
 
     inline VkCommandPool GetHandle() const { return m_Handle; }
 private:
-    VkCommandPool m_Handle = VK_NULL_HANDLE;
+    VkCommandPool m_Handle;
 };
 
 struct VulkanCmdBufferInputData
@@ -33,6 +33,10 @@ public:
     static VulkanCmdBuffer Allocate(VulkanCmdBufferInputData data);
     void Free();
 
+    void Begin();
+    void End();
+
+    inline void Reset() { VK_CHECK(vkResetCommandBuffer(m_Handle, 0)) }
     inline VkCommandBuffer GetHandle() const { return m_Handle; }
     inline VulkanCommandPool* GetPool() const { return m_PoolRef; } 
 private:

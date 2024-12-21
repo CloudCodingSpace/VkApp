@@ -34,6 +34,7 @@ VulkanCmdBuffer VulkanCmdBuffer::Allocate(VulkanCmdBufferInputData data)
     buff.m_PoolRef = &data.pool;
 
     VkCommandBufferAllocateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     info.commandBufferCount = 1;
     info.commandPool = data.pool.GetHandle();
     info.level = data.level;
@@ -46,5 +47,23 @@ VulkanCmdBuffer VulkanCmdBuffer::Allocate(VulkanCmdBufferInputData data)
 void VulkanCmdBuffer::Free()
 {
     VkCtx* ctx = VkCtxHandler::GetCrntCtx();
-    vkFreeCommandBuffers(ctx->device, m_PoolRef->GetHandle(), 1, &m_Handle);
+    VkCommandBuffer buffs[] = {
+        m_Handle
+    };
+    vkFreeCommandBuffers(ctx->device, m_PoolRef->GetHandle(), 1, buffs);
+}
+
+void VulkanCmdBuffer::Begin()
+{
+    VkCommandBufferBeginInfo info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pInheritanceInfo = nullptr
+    };
+
+    VK_CHECK(vkBeginCommandBuffer(m_Handle, &info))
+}
+
+void VulkanCmdBuffer::End()
+{
+    VK_CHECK(vkEndCommandBuffer(m_Handle))
 }

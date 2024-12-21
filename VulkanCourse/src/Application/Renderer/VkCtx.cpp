@@ -466,6 +466,13 @@ VkCtx* VkCtxHandler::GetCrntCtx()
 	return s_Ctx;
 }
 
+void VkCtxHandler::WaitDeviceIdle()
+{
+	CheckCrntCtx(__func__, __LINE__);
+
+	vkDeviceWaitIdle(s_Ctx->device);
+}
+
 void VkCtxHandler::CheckCrntCtx(std::string funcName, int lineNum)
 {
 	if (!s_Ctx)

@@ -31,7 +31,6 @@ VulkanRenderpass VulkanRenderpass::Create(uint32_t flags)
 		colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkSubpassDescription subpass{};
-		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = 1;
 		subpass.pColorAttachments = &colorRef;
 
@@ -40,12 +39,23 @@ VulkanRenderpass VulkanRenderpass::Create(uint32_t flags)
 			// TODO: Add the depth stencil ref to the renderpass
 		}
 
+		VkSubpassDependency spDependency = {
+			.srcSubpass = VK_SUBPASS_EXTERNAL,
+			.dstSubpass = 0,
+			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = 0,
+			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+		};
+
 		VkRenderPassCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		info.attachmentCount = 1; // TODO: Make it extendable
-		info.pAttachments = &colorAttach; // TODO: Make it extendable
+		info.attachmentCount = 1;
+		info.pAttachments = &colorAttach;
 		info.subpassCount = 1;
 		info.pSubpasses = &subpass;
+		info.dependencyCount = 1;
+		info.pDependencies = &spDependency;
 
 		VK_CHECK(vkCreateRenderPass(ctx->device, &info, nullptr, &pass.m_Handle))
 	}
@@ -58,4 +68,14 @@ void VulkanRenderpass::Destroy()
 	VkCtx* ctx = VkCtxHandler::GetCrntCtx();
 
 	vkDestroyRenderPass(ctx->device, m_Handle, nullptr);
+}
+
+void VulkanRenderpass::Begin(VkCommandBuffer buff, VkRenderPassBeginInfo& beginInfo)
+{
+	vkCmdBeginRenderPass(buff, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void VulkanRenderpass::End(VkCommandBuffer buff)
+{
+	vkCmdEndRenderPass(buff);
 }
