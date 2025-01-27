@@ -10,12 +10,12 @@ LibraryDir = {}
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 
 -- The config
-workspace "VulkanCourse"
+workspace "VkApp"
     architecture"x64"
-    startproject "VulkanCourse"
+    startproject "VkApp"
     configurations { 
-            "Debug",
-            "Release"
+        "Debug",
+        "Release"
     }
 
 
@@ -26,4 +26,4 @@ group "libs"
    include "libs/stb"
 group ""
 
-    include "VulkanCourse"
+    include "VkApp"
