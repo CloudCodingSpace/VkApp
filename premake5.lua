@@ -5,6 +5,7 @@ VULKAN_SDK = os.getenv("VULKAN_SDK")
 IncludeDir = {}
 IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 IncludeDir["glm"] = "../libs/glm"
+IncludeDir["ImGui"] = "../libs/ImGui"
 
 LibraryDir = {}
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
@@ -18,12 +19,11 @@ workspace "VkApp"
         "Release"
     }
 
-
-
 group "libs"
    include "libs/tinyobj"
    include "libs/GLFW"
    include "libs/stb"
+   include "libs/ImGui"
 group ""
 
     include "VkApp"

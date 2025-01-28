@@ -20,6 +20,7 @@ project "VkApp"
 
       "%{IncludeDir.VulkanSDK}",
       "%{IncludeDir.glm}",
+      "%{IncludeDir.ImGui}"
     }
 
     flags
@@ -36,7 +37,8 @@ project "VkApp"
     {
         "GLFW",
         "TinyOBJ",
-        "STB"
+        "STB",
+        "ImGui"
     }
 
     defines

@@ -4,3 +4,7 @@
 [submodule "GLFW"]
 	path = libs/GLFW
 	url = https://github.com/CloudCodingSpace/GLFW
+[submodule "ImGui"]
+	path = libs/ImGui
+	url = https://github.com/CloudCodingSpace/ImGui
+	branch = docking
