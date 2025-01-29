@@ -2,7 +2,7 @@
 
 void log_output(log_severity severity, std::string msg)
 {
-    std::string message = "[VulkanApplication] ";
+    std::string message = "[VkApp] ";
     switch (severity) {
     case LOG_SEVERITY_INFO:
         printf("\033[0;32m");
