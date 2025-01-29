@@ -1,7 +1,9 @@
 #include "Renderer.h"
 
-Renderer::Renderer(Window& window)
+Renderer::Renderer(std::shared_ptr<Window> window)
 {
+	m_Window = window;
+
 	// The Ctx
 	VkCtxHandler::SetCrntCtx(m_Ctx);
 	VkCtxHandler::InitCtx(window);
@@ -72,7 +74,10 @@ void Renderer::Render()
 
 void Renderer::Update()
 {
-
+	if (m_Ctx.scExtent.width != m_Window->GetWidth() || m_Ctx.scExtent.height != m_Window->GetHeight())
+	{
+		OnResize(m_Window->GetWidth(), m_Window->GetHeight());
+	}
 }
 
 void Renderer::BeginFrame()
@@ -80,7 +85,17 @@ void Renderer::BeginFrame()
 	VK_CHECK(vkWaitForFences(m_Ctx.device, 1, &m_InFlightFence, VK_TRUE, MAX_UINT64))
 	VK_CHECK(vkResetFences(m_Ctx.device, 1, &m_InFlightFence))
 
-	VK_CHECK(vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSema, VK_NULL_HANDLE, &m_CrntImgIdx))
+	VkResult result = vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSema, VK_NULL_HANDLE, &m_CrntImgIdx);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		OnResize(m_Window->GetWidth(), m_Window->GetHeight());
+		return;
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		std::string resultStr = string_VkResult(result);
+		std::string msg = "VkResult is " + resultStr;
+		FATAL(msg);
+	}
 }
 
 void Renderer::EndFrame()
@@ -127,7 +142,16 @@ void Renderer::EndFrame()
 		presentInfo.pWaitSemaphores = waitSemas;
 		presentInfo.pImageIndices = &m_CrntImgIdx;
 
-		VK_CHECK(vkQueuePresentKHR(m_Ctx.pQueue, &presentInfo))
+		VkResult result = vkQueuePresentKHR(m_Ctx.pQueue, &presentInfo);
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+		{
+			OnResize(m_Window->GetWidth(), m_Window->GetHeight());
+			return;
+		}
+		else
+		{
+			VK_CHECK(result)
+		}
 	}
 }
 
@@ -181,4 +205,36 @@ void Renderer::DestroySyncObjs()
 	vkDestroyFence(m_Ctx.device, m_InFlightFence, nullptr);
 	vkDestroySemaphore(m_Ctx.device, m_ImgAvailableSema, nullptr);
 	vkDestroySemaphore(m_Ctx.device, m_RndrFinishedSema, nullptr);
+}
+
+void Renderer::OnResize(uint32_t width, uint32_t height)
+{
+	while (m_Window->GetWidth() == 0 || m_Window->GetHeight() == 0) {
+		glfwWaitEvents();
+	}
+
+	VkCtxHandler::WaitDeviceIdle();
+
+	for (auto& buff : m_Framebuffs)
+		buff.Destroy();
+
+	VkCtxHandler::OnResize(m_Window, width, height);
+
+	VulkanFramebufferInputData inputData{};
+	inputData.width = m_Ctx.scExtent.width;
+	inputData.height = m_Ctx.scExtent.height;
+	inputData.pass = m_Pass;
+
+	int i = 0;
+	m_Framebuffs.resize(m_Ctx.scImgViews.size());
+	for (const auto& imgView : m_Ctx.scImgViews)
+	{
+		inputData.views = {
+			imgView
+		};
+
+		m_Framebuffs[i] = VulkanFramebuffer::Create(inputData);
+
+		i++;
+	}
 }

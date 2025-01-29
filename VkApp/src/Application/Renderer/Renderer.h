@@ -5,10 +5,12 @@
 #include "VulkanFramebuffer.h"
 #include "VulkanCommand.h"
 
+#include <memory>
+
 class Renderer
 {
 public:
-	Renderer(Window& window);
+	Renderer(std::shared_ptr<Window> window);
 	~Renderer();
 
 	void Render();
@@ -25,6 +27,8 @@ private:
 	VkFence m_InFlightFence = VK_NULL_HANDLE;
 	VkSemaphore m_ImgAvailableSema = VK_NULL_HANDLE, m_RndrFinishedSema = VK_NULL_HANDLE;
 
+	std::shared_ptr<Window> m_Window;
+
 private:
 	void BeginFrame();
 	void EndFrame();
@@ -33,4 +37,6 @@ private:
 
 	void CreateSyncObjs();
 	void DestroySyncObjs();
+
+	void OnResize(uint32_t width, uint32_t height);
 };

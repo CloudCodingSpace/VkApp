@@ -8,7 +8,6 @@ Window::Window(int width, int height, std::string title) : m_Width{width}, m_Hei
 		throw std::runtime_error("Failed to init GLFW!");
 
 	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 	m_Handle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);

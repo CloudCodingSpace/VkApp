@@ -2,14 +2,8 @@
 
 Application::Application()
 {
-	m_Window = new Window(800, 600, "VkApp");
-	m_Renderer = new Renderer(*m_Window);
-}
-
-Application::~Application()
-{
-	delete m_Renderer;
-	delete m_Window;
+	m_Window = std::make_shared<Window>(800, 600, "VkApp");
+	m_Renderer = std::make_shared<Renderer>(m_Window);
 }
 
 void Application::Run()

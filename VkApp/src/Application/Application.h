@@ -7,11 +7,9 @@ class Application
 {
 public:
 	Application();
-	~Application();
 
 	void Run();
-
 private:
-	Window* m_Window = nullptr;
-	Renderer* m_Renderer = nullptr;
+	std::shared_ptr<Window> m_Window;
+	std::shared_ptr<Renderer> m_Renderer;
 };

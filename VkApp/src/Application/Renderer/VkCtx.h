@@ -5,6 +5,7 @@
 #include <Window/Window.h>
 #include <limits>
 #include <vector>
+#include <memory>
 
 struct VulkanQueueFamilyProps
 {
@@ -63,8 +64,10 @@ struct VkCtx
 class VkCtxHandler
 {
 public:
-	static void InitCtx(Window& window);
+	static void InitCtx(std::shared_ptr<Window> window);
 	static void DestroyCtx();
+
+	static void OnResize(std::shared_ptr<Window> window, uint32_t width, uint32_t height);
 
 	static void SetCrntCtx(VkCtx& ctx);
 	static VkCtx* GetCrntCtx();

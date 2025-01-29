@@ -116,7 +116,7 @@ static void GetScCaps()
 	}
 }
 
-static void SelectScProps(Window& window)
+static void SelectScProps(std::shared_ptr<Window> window)
 {
 	// Selecting the present mode
 	{
@@ -156,7 +156,7 @@ static void SelectScProps(Window& window)
 		else
 		{
 			int width, height;
-			glfwGetFramebufferSize(window.GetInternHandle(), &width, &height);
+			glfwGetFramebufferSize(window->GetInternHandle(), &width, &height);
 
 			s_Ctx->scExtent = {
 				static_cast<uint32_t>(width),
@@ -169,7 +169,92 @@ static void SelectScProps(Window& window)
 	}
 }
 
-void VkCtxHandler::InitCtx(Window& window)
+static void CreateSwapchain(std::shared_ptr<Window> window)
+{
+	GetScCaps(); // Retrieving the various surface's rendering capabilities
+	SelectScProps(window); // Selecting the most appropriate present modes, formats, extent for the swapchain
+
+	{
+		auto caps = s_Ctx->scCaps.caps;
+
+		uint32_t imgCount = caps.minImageCount + 1;
+		if (caps.maxImageCount > 0 && imgCount > caps.maxImageCount)
+		{
+			imgCount = caps.maxImageCount;
+		}
+
+		VkSwapchainCreateInfoKHR info{};
+		info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		info.surface = s_Ctx->surface;
+		info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+		info.minImageCount = imgCount;
+		info.imageFormat = s_Ctx->scFormat.format;
+		info.imageColorSpace = s_Ctx->scFormat.colorSpace;
+		info.preTransform = caps.currentTransform;
+		info.presentMode = s_Ctx->scMode;
+		info.imageArrayLayers = 1;
+		info.imageExtent = s_Ctx->scExtent;
+		info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		info.clipped = VK_TRUE;
+		info.oldSwapchain = VK_NULL_HANDLE;
+
+		uint32_t familiesIdxs[] = {
+			s_Ctx->queueProps.graphicsQueueIdx,
+			s_Ctx->queueProps.presentQueueIdx,
+			s_Ctx->queueProps.transferQueueIdx
+		};
+
+		if (familiesIdxs[0] != familiesIdxs[1] || familiesIdxs[1] != familiesIdxs[2] || familiesIdxs[0] != familiesIdxs[2])
+		{
+			info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			info.queueFamilyIndexCount = 3;
+			info.pQueueFamilyIndices = familiesIdxs;
+		}
+		else
+		{
+			info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		}
+
+		VK_CHECK(vkCreateSwapchainKHR(s_Ctx->device, &info, nullptr, &s_Ctx->swapchain))
+	}
+	// Retrieving the swapchain images
+	{
+		uint32_t count = 0;
+		VK_CHECK(vkGetSwapchainImagesKHR(s_Ctx->device, s_Ctx->swapchain, &count, nullptr))
+			s_Ctx->scImgs.resize(count);
+		VK_CHECK(vkGetSwapchainImagesKHR(s_Ctx->device, s_Ctx->swapchain, &count, s_Ctx->scImgs.data()))
+	}
+	// Creating the image views
+	{
+		s_Ctx->scImgViews.resize(s_Ctx->scImgs.size());
+		int i = 0;
+		for (const auto& img : s_Ctx->scImgs)
+		{
+			VkImageViewCreateInfo info{};
+			info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			info.image = img;
+			info.components = {
+				VK_COMPONENT_SWIZZLE_IDENTITY,
+				VK_COMPONENT_SWIZZLE_IDENTITY,
+				VK_COMPONENT_SWIZZLE_IDENTITY,
+				VK_COMPONENT_SWIZZLE_IDENTITY
+			};
+			info.format = s_Ctx->scFormat.format;
+			info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			info.subresourceRange.baseArrayLayer = 0;
+			info.subresourceRange.baseMipLevel = 0;
+			info.subresourceRange.layerCount = 1;
+			info.subresourceRange.levelCount = 1;
+
+			VK_CHECK(vkCreateImageView(s_Ctx->device, &info, nullptr, &s_Ctx->scImgViews[i]))
+
+				i++;
+		}
+	}
+}
+
+void VkCtxHandler::InitCtx(std::shared_ptr<Window> window)
 {
 	CheckCrntCtx(__func__, __LINE__);
 
@@ -266,7 +351,7 @@ void VkCtxHandler::InitCtx(Window& window)
 
 		// Creating the window surface
 	{
-		VK_CHECK(glfwCreateWindowSurface(s_Ctx->instance, window.GetInternHandle(), nullptr, &s_Ctx->surface))
+		VK_CHECK(glfwCreateWindowSurface(s_Ctx->instance, window->GetInternHandle(), nullptr, &s_Ctx->surface))
 	}
 
 	// Selecting a suitable physical device
@@ -350,88 +435,8 @@ void VkCtxHandler::InitCtx(Window& window)
 		vkGetDeviceQueue(s_Ctx->device, s_Ctx->queueProps.transferQueueIdx, 0, &s_Ctx->tQueue);
 	}
 
-	GetScCaps(); // Retrieving the various surface's rendering capabilities
-	SelectScProps(window); // Selecting the most appropriate present modes, formats, extent for the swapchain
-
 	// Creating the swapchain
-	{
-		auto caps = s_Ctx->scCaps.caps;
-
-		uint32_t imgCount = caps.minImageCount + 1;
-		if (caps.maxImageCount > 0 && imgCount > caps.maxImageCount)
-		{
-			imgCount = caps.maxImageCount;
-		}
-
-		VkSwapchainCreateInfoKHR info{};
-		info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		info.surface = s_Ctx->surface;
-		info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-		info.minImageCount = imgCount;
-		info.imageFormat = s_Ctx->scFormat.format;
-		info.imageColorSpace = s_Ctx->scFormat.colorSpace;
-		info.preTransform = caps.currentTransform;
-		info.presentMode = s_Ctx->scMode;
-		info.imageArrayLayers = 1;
-		info.imageExtent = s_Ctx->scExtent;
-		info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		info.clipped = VK_TRUE;
-		info.oldSwapchain = VK_NULL_HANDLE;
-
-		uint32_t familiesIdxs[] = {
-			s_Ctx->queueProps.graphicsQueueIdx,
-			s_Ctx->queueProps.presentQueueIdx,
-			s_Ctx->queueProps.transferQueueIdx
-		};
-
-		if (familiesIdxs[0] != familiesIdxs[1] || familiesIdxs[1] != familiesIdxs[2] || familiesIdxs[0] != familiesIdxs[2])
-		{
-			info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-			info.queueFamilyIndexCount = 3;
-			info.pQueueFamilyIndices = familiesIdxs;
-		}
-		else
-		{
-			info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		}
-
-		VK_CHECK(vkCreateSwapchainKHR(s_Ctx->device, &info, nullptr, &s_Ctx->swapchain))
-	}
-	// Retrieving the swapchain images
-	{
-		uint32_t count = 0;
-		VK_CHECK(vkGetSwapchainImagesKHR(s_Ctx->device, s_Ctx->swapchain, &count, nullptr))
-		s_Ctx->scImgs.resize(count);
-		VK_CHECK(vkGetSwapchainImagesKHR(s_Ctx->device, s_Ctx->swapchain, &count, s_Ctx->scImgs.data()))
-	}
-	// Creating the image views
-	{
-		s_Ctx->scImgViews.resize(s_Ctx->scImgs.size());
-		int i = 0;
-		for (const auto& img : s_Ctx->scImgs)
-		{
-			VkImageViewCreateInfo info{};
-			info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			info.image = img;
-			info.components = {
-				VK_COMPONENT_SWIZZLE_IDENTITY,
-				VK_COMPONENT_SWIZZLE_IDENTITY,
-				VK_COMPONENT_SWIZZLE_IDENTITY,
-				VK_COMPONENT_SWIZZLE_IDENTITY
-			};
-			info.format = s_Ctx->scFormat.format;
-			info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			info.subresourceRange.baseArrayLayer = 0;
-			info.subresourceRange.baseMipLevel = 0;
-			info.subresourceRange.layerCount = 1;
-			info.subresourceRange.levelCount = 1;
-
-			VK_CHECK(vkCreateImageView(s_Ctx->device, &info, nullptr, &s_Ctx->scImgViews[i]))
-
-			i++;
-		}
-	}
+	CreateSwapchain(window);
 }
 
 void VkCtxHandler::DestroyCtx()
@@ -454,6 +459,19 @@ void VkCtxHandler::DestroyCtx()
 #endif
 
 	vkDestroyInstance(s_Ctx->instance, nullptr);
+}
+
+void VkCtxHandler::OnResize(std::shared_ptr<Window> window, uint32_t width, uint32_t height)
+{
+	s_Ctx->scImgs.clear();
+	for (const auto& imgView : s_Ctx->scImgViews)
+	{
+		vkDestroyImageView(s_Ctx->device, imgView, nullptr);
+	}
+
+	vkDestroySwapchainKHR(s_Ctx->device, s_Ctx->swapchain, nullptr);
+
+	CreateSwapchain(window);
 }
 
 void VkCtxHandler::SetCrntCtx(VkCtx& ctx)
