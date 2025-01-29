@@ -3,6 +3,7 @@
 Renderer::Renderer(std::shared_ptr<Window> window)
 {
 	m_Window = window;
+	m_CurrentFrameIdx = 0;
 
 	// The Ctx
 	VkCtxHandler::SetCrntCtx(m_Ctx);
@@ -41,10 +42,13 @@ Renderer::Renderer(std::shared_ptr<Window> window)
 		poolData.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		m_CmdPool = VulkanCommandPool::Create(poolData);
 
-		VulkanCmdBufferInputData buffData{};
-		buffData.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		buffData.pool = m_CmdPool;
-		m_CmdBuff = VulkanCmdBuffer::Allocate(buffData);
+		for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			VulkanCmdBufferInputData buffData{};
+			buffData.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			buffData.pool = m_CmdPool;
+			m_CmdBuffs[i] = VulkanCmdBuffer::Allocate(buffData);
+		}
 	}
 }
 
@@ -82,10 +86,10 @@ void Renderer::Update()
 
 void Renderer::BeginFrame()
 {
-	VK_CHECK(vkWaitForFences(m_Ctx.device, 1, &m_InFlightFence, VK_TRUE, MAX_UINT64))
-	VK_CHECK(vkResetFences(m_Ctx.device, 1, &m_InFlightFence))
+	VK_CHECK(vkWaitForFences(m_Ctx.device, 1, &m_InFlightFences[m_CurrentFrameIdx], VK_TRUE, MAX_UINT64))
+	VK_CHECK(vkResetFences(m_Ctx.device, 1, &m_InFlightFences[m_CurrentFrameIdx]))
 
-	VkResult result = vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSema, VK_NULL_HANDLE, &m_CrntImgIdx);
+	VkResult result = vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSemas[m_CurrentFrameIdx], VK_NULL_HANDLE, &m_CrntImgIdx);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
 		OnResize(m_Window->GetWidth(), m_Window->GetHeight());
@@ -99,17 +103,17 @@ void Renderer::BeginFrame()
 }
 
 void Renderer::EndFrame()
-{	
+{
 	// Submit
 	{
-		auto cmdBuffHandle = m_CmdBuff.GetHandle();
+		auto cmdBuffHandle = m_CmdBuffs[m_CurrentFrameIdx].GetHandle();
 
 		VkSemaphore waitSemas[] = {
-			m_ImgAvailableSema
+			m_ImgAvailableSemas[m_CurrentFrameIdx]
 		};
 
 		VkSemaphore signalSemas[] = {
-			m_RndrFinishedSema
+			m_RndrFinishedSemas[m_CurrentFrameIdx]
 		};
 
 		VkPipelineStageFlags waitDstFlags[] = {
@@ -126,12 +130,12 @@ void Renderer::EndFrame()
 		submitInfo.pSignalSemaphores = signalSemas;
 		submitInfo.pWaitDstStageMask = waitDstFlags;
 
-		VK_CHECK(vkQueueSubmit(m_Ctx.gQueue, 1, &submitInfo, m_InFlightFence))
+		VK_CHECK(vkQueueSubmit(m_Ctx.gQueue, 1, &submitInfo, m_InFlightFences[m_CurrentFrameIdx]))
 	}
 	// Present
 	{
 		VkSemaphore waitSemas[] = {
-			m_RndrFinishedSema
+			m_RndrFinishedSemas[m_CurrentFrameIdx]
 		};
 
 		VkPresentInfoKHR presentInfo{};
@@ -153,12 +157,14 @@ void Renderer::EndFrame()
 			VK_CHECK(result)
 		}
 	}
+
+	m_CurrentFrameIdx = (m_CurrentFrameIdx + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void Renderer::RecordFrame()
 {
-	m_CmdBuff.Reset();
-	m_CmdBuff.Begin();
+	m_CmdBuffs[m_CurrentFrameIdx].Reset();
+	m_CmdBuffs[m_CurrentFrameIdx].Begin();
 
 	auto& frameBuff = m_Framebuffs[m_CrntImgIdx];
 
@@ -176,12 +182,12 @@ void Renderer::RecordFrame()
 		.pClearValues = &clearVal
 	};
 
-	m_Pass.Begin(m_CmdBuff.GetHandle(), rpBeginInfo);
+	m_Pass.Begin(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), rpBeginInfo);
 
 	// Other commands
 
-	m_Pass.End(m_CmdBuff.GetHandle());
-	m_CmdBuff.End();
+	m_Pass.End(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
+	m_CmdBuffs[m_CurrentFrameIdx].End();
 }
 
 void Renderer::CreateSyncObjs()
@@ -195,16 +201,22 @@ void Renderer::CreateSyncObjs()
 		.flags = VK_FENCE_CREATE_SIGNALED_BIT
 	};
 
-	VK_CHECK(vkCreateFence(m_Ctx.device, &fenceInfo, nullptr, &m_InFlightFence))
-	VK_CHECK(vkCreateSemaphore(m_Ctx.device, &semaInfo, nullptr, &m_ImgAvailableSema))
-	VK_CHECK(vkCreateSemaphore(m_Ctx.device, &semaInfo, nullptr, &m_RndrFinishedSema))
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		VK_CHECK(vkCreateFence(m_Ctx.device, &fenceInfo, nullptr, &m_InFlightFences[i]))
+		VK_CHECK(vkCreateSemaphore(m_Ctx.device, &semaInfo, nullptr, &m_ImgAvailableSemas[i]))
+		VK_CHECK(vkCreateSemaphore(m_Ctx.device, &semaInfo, nullptr, &m_RndrFinishedSemas[i]))
+	}
 }
 
 void Renderer::DestroySyncObjs()
 {
-	vkDestroyFence(m_Ctx.device, m_InFlightFence, nullptr);
-	vkDestroySemaphore(m_Ctx.device, m_ImgAvailableSema, nullptr);
-	vkDestroySemaphore(m_Ctx.device, m_RndrFinishedSema, nullptr);
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		vkDestroyFence(m_Ctx.device, m_InFlightFences[i], nullptr);
+		vkDestroySemaphore(m_Ctx.device, m_ImgAvailableSemas[i], nullptr);
+		vkDestroySemaphore(m_Ctx.device, m_RndrFinishedSemas[i], nullptr);
+	}
 }
 
 void Renderer::OnResize(uint32_t width, uint32_t height)

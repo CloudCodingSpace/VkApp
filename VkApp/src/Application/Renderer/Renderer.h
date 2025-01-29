@@ -7,6 +7,8 @@
 
 #include <memory>
 
+#define MAX_FRAMES_IN_FLIGHT 2
+
 class Renderer
 {
 public:
@@ -17,15 +19,15 @@ public:
 	void Update();
 
 private:
-	uint32_t m_CrntImgIdx;
+	uint32_t m_CrntImgIdx, m_CurrentFrameIdx;
 	VkCtx m_Ctx{};
 	VulkanRenderpass m_Pass;
 	std::vector<VulkanFramebuffer> m_Framebuffs;
 	VulkanCommandPool m_CmdPool;
-	VulkanCmdBuffer m_CmdBuff;
+	VulkanCmdBuffer m_CmdBuffs[MAX_FRAMES_IN_FLIGHT];
 	// Sync objs
-	VkFence m_InFlightFence = VK_NULL_HANDLE;
-	VkSemaphore m_ImgAvailableSema = VK_NULL_HANDLE, m_RndrFinishedSema = VK_NULL_HANDLE;
+	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
+	VkSemaphore m_ImgAvailableSemas[MAX_FRAMES_IN_FLIGHT], m_RndrFinishedSemas[MAX_FRAMES_IN_FLIGHT];
 
 	std::shared_ptr<Window> m_Window;
 
