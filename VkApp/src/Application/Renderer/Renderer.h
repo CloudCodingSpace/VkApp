@@ -4,6 +4,7 @@
 #include "VulkanRenderpass.h"
 #include "VulkanFramebuffer.h"
 #include "VulkanCommand.h"
+#include "VulkanPipeline.h"
 
 #include <memory>
 
@@ -25,6 +26,7 @@ private:
 	std::vector<VulkanFramebuffer> m_Framebuffs;
 	VulkanCommandPool m_CmdPool;
 	VulkanCmdBuffer m_CmdBuffs[MAX_FRAMES_IN_FLIGHT];
+	VulkanPipeline m_Pipeline;
 	// Sync objs
 	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
 	VkSemaphore m_ImgAvailableSemas[MAX_FRAMES_IN_FLIGHT], m_RndrFinishedSemas[MAX_FRAMES_IN_FLIGHT];

@@ -1,5 +1,7 @@
 #include "Renderer.h"
 
+#include "Utils.h"
+
 Renderer::Renderer(std::shared_ptr<Window> window)
 {
 	m_Window = window;
@@ -50,11 +52,24 @@ Renderer::Renderer(std::shared_ptr<Window> window)
 			m_CmdBuffs[i] = VulkanCmdBuffer::Allocate(buffData);
 		}
 	}
+	// Pipeline
+	{
+		VulkanPipelineInfo info;
+		info.type = VulkanPipelineType::VULKAN_PIPELINE_TYPE_GRAPHICS;
+		info.extent = m_Ctx.scExtent;
+		info.vertPath = "assets/shaders/default.vert.spv";
+		info.fragPath = "assets/shaders/default.frag.spv";
+		info.renderPass = m_Pass.GetHandle();
+
+		m_Pipeline = VulkanPipeline::Create(info);
+	}
 }
 
 Renderer::~Renderer()
 {
 	VkCtxHandler::WaitDeviceIdle();
+
+	m_Pipeline.Destroy();
 
 	DestroySyncObjs();
 
@@ -184,7 +199,23 @@ void Renderer::RecordFrame()
 
 	m_Pass.Begin(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), rpBeginInfo);
 
-	// Other commands
+	m_Pipeline.Bind(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = (float)m_Ctx.scExtent.height;
+	viewport.width = (float)m_Ctx.scExtent.width;
+	viewport.height = -(float)m_Ctx.scExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = m_Ctx.scExtent;
+	vkCmdSetScissor(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &scissor);
+
+	vkCmdDraw(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 3, 1, 0, 0);
 
 	m_Pass.End(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
 	m_CmdBuffs[m_CurrentFrameIdx].End();
