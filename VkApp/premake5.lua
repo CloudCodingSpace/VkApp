@@ -40,7 +40,8 @@ project "VkApp"
         "GLFW",
         "TinyOBJ",
         "STB",
-        "ImGui"
+        "ImGui",
+        "VMA"
     }
 
     defines
@@ -58,7 +59,7 @@ project "VkApp"
         }
 
     filter "action:gmake or action:gmake2"
-	filter "system:windows"
+	    filter "system:windows"
             links { "gdi32", "user32", "shell32" }
 
         links
