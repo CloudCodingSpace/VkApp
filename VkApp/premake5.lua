@@ -40,8 +40,7 @@ project "VkApp"
         "GLFW",
         "TinyOBJ",
         "STB",
-        "ImGui",
-        "VMA"
+        "ImGui"
     }
 
     defines

@@ -24,7 +24,6 @@ group "libs"
    include "libs/GLFW"
    include "libs/stb"
    include "libs/ImGui"
-   include "libs/VMA"
 group ""
 
     include "VkApp"
