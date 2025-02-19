@@ -9,6 +9,7 @@ Application::Application()
 void Application::Run()
 {
 	m_Window->Show();
+	m_Renderer->SetClearColor(0.1f, 0.1f, 0.1f);
 	while (m_Window->IsOpened())
 	{
 		m_Renderer->Render();

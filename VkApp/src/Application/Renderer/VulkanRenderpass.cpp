@@ -39,14 +39,13 @@ VulkanRenderpass VulkanRenderpass::Create(uint32_t flags)
 			// TODO: Add the depth stencil ref to the renderpass
 		}
 
-		VkSubpassDependency spDependency = {
-			.srcSubpass = VK_SUBPASS_EXTERNAL,
-			.dstSubpass = 0,
-			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			.srcAccessMask = 0,
-			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-		};
+		VkSubpassDependency spDependency{};
+		spDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		spDependency.dstSubpass = 0;
+		spDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		spDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		spDependency.srcAccessMask = 0;
+		spDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		VkRenderPassCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;

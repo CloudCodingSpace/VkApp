@@ -55,10 +55,9 @@ void VulkanCmdBuffer::Free()
 
 void VulkanCmdBuffer::Begin()
 {
-    VkCommandBufferBeginInfo info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pInheritanceInfo = nullptr
-    };
+    VkCommandBufferBeginInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    info.pInheritanceInfo = nullptr;
 
     VK_CHECK(vkBeginCommandBuffer(m_Handle, &info))
 }

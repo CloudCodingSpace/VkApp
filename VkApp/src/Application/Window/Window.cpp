@@ -13,6 +13,9 @@ Window::Window(int width, int height, std::string title) : m_Width{width}, m_Hei
 	m_Handle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
 	if (!m_Handle)
 		FATAL("Failed to create the window!");
+
+	glfwSetWindowUserPointer(m_Handle, this);
+	glfwSetFramebufferSizeCallback(m_Handle, SizeCallback);
 }
 
 Window::~Window()
@@ -32,4 +35,11 @@ void Window::Update(std::function<void(void)> callback)
 		callback();
 
 	glfwPollEvents();
+}
+
+void Window::SizeCallback(GLFWwindow* window, int w, int h)
+{
+	Window* win = (Window*) glfwGetWindowUserPointer(window);
+	win->m_Width = w;
+	win->m_Height = h;
 }

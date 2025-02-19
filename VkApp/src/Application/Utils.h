@@ -57,3 +57,5 @@ inline std::vector<char> ReadFile(std::filesystem::path path)
 #define MIN_INT32 std::numeric_limits<int32_t>::min()
 #define MAX_INT64 std::numeric_limits<int64_t>::max()
 #define MIN_INT64 std::numeric_limits<int64_t>::min()
+
+#define INVALID_IDX MAX_UINT32

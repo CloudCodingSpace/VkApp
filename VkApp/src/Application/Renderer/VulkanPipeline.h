@@ -14,9 +14,11 @@ enum class VulkanPipelineType
 struct VulkanPipelineInfo
 {
 	VulkanPipelineType type;
-	uint32_t layoutCount = 0, pushConstRangeCount = 0;
+	uint32_t layoutCount = 0, pushConstRangeCount = 0, vertBindingCount = 0, vertAttribCount = 0;
 	VkDescriptorSetLayout* layouts = nullptr;
 	VkPushConstantRange* pushConstRanges = nullptr;
+	VkVertexInputBindingDescription* vertBindings = nullptr;
+	VkVertexInputAttributeDescription* vertAttribs = nullptr;
 	VkRenderPass renderPass = nullptr;
 	std::string vertPath, fragPath;
 	bool enableCulling = true, enableDepthClamp = false, enableRasterizationDiscard = false;

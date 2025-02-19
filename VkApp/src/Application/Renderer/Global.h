@@ -8,4 +8,8 @@ struct Vertex
 {
 	glm::vec3 pos;
 	glm::vec3 col;
+
+	static VkVertexInputBindingDescription GetBindingDesc();
+	static VkVertexInputAttributeDescription GetPosAttribDesc();
+	static VkVertexInputAttributeDescription GetColAttribDesc();
 };

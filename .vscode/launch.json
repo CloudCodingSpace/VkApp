@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Proj. Launch",
+            "program": "${workspaceFolder}/bin/Debug-windows-x86_64/VkApp/VkApp.exe",
+            "type": "cppdbg",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/VkApp",
+            "externalConsole": true,
+            "stopAtEntry": false
+        }
+    ]
+}

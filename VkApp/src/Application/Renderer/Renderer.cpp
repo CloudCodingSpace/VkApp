@@ -1,5 +1,7 @@
 #include "Renderer.h"
 
+#include "Global.h"
+
 #include "Utils.h"
 
 Renderer::Renderer(std::shared_ptr<Window> window)
@@ -54,14 +56,46 @@ Renderer::Renderer(std::shared_ptr<Window> window)
 	}
 	// Pipeline
 	{
+		std::vector<VkVertexInputBindingDescription> bindingDescs;
+		std::vector<VkVertexInputAttributeDescription> attribDescs;
+
+		bindingDescs.push_back(Vertex::GetBindingDesc());
+
+		attribDescs.push_back(Vertex::GetPosAttribDesc());
+		attribDescs.push_back(Vertex::GetColAttribDesc());
+
 		VulkanPipelineInfo info;
 		info.type = VulkanPipelineType::VULKAN_PIPELINE_TYPE_GRAPHICS;
 		info.extent = m_Ctx.scExtent;
 		info.vertPath = "assets/shaders/default.vert.spv";
 		info.fragPath = "assets/shaders/default.frag.spv";
 		info.renderPass = m_Pass.GetHandle();
+		info.vertBindingCount = bindingDescs.size();
+		info.vertBindings = bindingDescs.data();
+		info.vertAttribCount = attribDescs.size();
+		info.vertAttribs = attribDescs.data();
 
 		m_Pipeline = VulkanPipeline::Create(info);
+	}
+	// Vert Buffer
+	{	
+		Vertex vertices[3];
+		vertices[0].pos = glm::vec3( 0.0f,  0.5f, 0.0f);
+		vertices[1].pos = glm::vec3( 0.5f, -0.5f, 0.0f);
+		vertices[2].pos = glm::vec3(-0.5f, -0.5f, 0.0f);
+
+		vertices[0].col = glm::vec3(1.0f, 0.0f, 0.0f);
+		vertices[1].col = glm::vec3(0.0f, 1.0f, 0.0f);
+		vertices[2].col = glm::vec3(0.0f, 0.0f, 1.0f);
+	
+		m_VertCount = 3;
+
+		VulkanBufferInputData inputData{};
+		inputData.data = vertices;
+		inputData.pool = m_CmdPool;
+		inputData.size = sizeof(vertices[0]) * 3;
+
+		m_VertBuffer = VulkanBuffer::Create(VulkanBufferType::VULKAN_BUFFER_TYPE_VERTEX, inputData);
 	}
 }
 
@@ -72,6 +106,8 @@ Renderer::~Renderer()
 	m_Pipeline.Destroy();
 
 	DestroySyncObjs();
+
+	m_VertBuffer.Destroy();
 
 	m_CmdPool.Destroy();
 
@@ -97,6 +133,11 @@ void Renderer::Update()
 	{
 		OnResize(m_Window->GetWidth(), m_Window->GetHeight());
 	}
+}
+
+void Renderer::SetClearColor(float r, float g, float b)
+{
+	m_ClearVal = {{{ r, g, b, 1.0f }}};
 }
 
 void Renderer::BeginFrame()
@@ -185,17 +226,14 @@ void Renderer::RecordFrame()
 
 	VkClearValue clearVal = {{{ 0.1f, 0.1f, 0.1f, 1.0f }}};
 
-	VkRenderPassBeginInfo rpBeginInfo = {
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass = m_Pass.GetHandle(),
-		.framebuffer = frameBuff.GetHandle(),
-		.renderArea = {
-			.offset = { 0, 0 },
-			.extent = m_Ctx.scExtent
-		},
-		.clearValueCount = 1,
-		.pClearValues = &clearVal
-	};
+	VkRenderPassBeginInfo rpBeginInfo{};
+	rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpBeginInfo.renderPass = m_Pass.GetHandle();
+	rpBeginInfo.framebuffer = frameBuff.GetHandle();
+	rpBeginInfo.renderArea.offset = { 0, 0 };
+	rpBeginInfo.renderArea.extent = m_Ctx.scExtent;
+	rpBeginInfo.clearValueCount = 1;
+	rpBeginInfo.pClearValues = &m_ClearVal;
 
 	m_Pass.Begin(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), rpBeginInfo);
 
@@ -215,7 +253,11 @@ void Renderer::RecordFrame()
 	scissor.extent = m_Ctx.scExtent;
 	vkCmdSetScissor(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &scissor);
 
-	vkCmdDraw(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 3, 1, 0, 0);
+	VkBuffer vertBuff[] = { m_VertBuffer.GetHandle() };
+	VkDeviceSize offsets[] = {0};
+
+	vkCmdBindVertexBuffers(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, vertBuff, offsets);
+	vkCmdDraw(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_VertCount, 1, 0, 0);
 
 	m_Pass.End(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
 	m_CmdBuffs[m_CurrentFrameIdx].End();
@@ -223,14 +265,12 @@ void Renderer::RecordFrame()
 
 void Renderer::CreateSyncObjs()
 {
-	VkSemaphoreCreateInfo semaInfo = {
-		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
-	};
+	VkSemaphoreCreateInfo semaInfo{};
+	semaInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-	VkFenceCreateInfo fenceInfo = {
-		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-		.flags = VK_FENCE_CREATE_SIGNALED_BIT
-	};
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{

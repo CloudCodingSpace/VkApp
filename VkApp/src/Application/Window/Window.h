@@ -22,4 +22,6 @@ public:
 private:
 	GLFWwindow* m_Handle = nullptr;
 	int m_Width, m_Height;
+
+	static void SizeCallback(GLFWwindow* window, int w, int h);
 };

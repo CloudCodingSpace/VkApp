@@ -5,6 +5,7 @@
 #include "VulkanFramebuffer.h"
 #include "VulkanCommand.h"
 #include "VulkanPipeline.h"
+#include "VulkanBuffer.h"
 
 #include <memory>
 
@@ -19,15 +20,19 @@ public:
 	void Render();
 	void Update();
 
+	void SetClearColor(float r, float g, float b);
 private:
-	uint32_t m_CrntImgIdx, m_CurrentFrameIdx;
+	uint32_t m_CrntImgIdx, m_CurrentFrameIdx, m_VertCount;
+	VkClearValue m_ClearVal{};
+	
 	VkCtx m_Ctx{};
 	VulkanRenderpass m_Pass;
 	std::vector<VulkanFramebuffer> m_Framebuffs;
 	VulkanCommandPool m_CmdPool;
 	VulkanCmdBuffer m_CmdBuffs[MAX_FRAMES_IN_FLIGHT];
 	VulkanPipeline m_Pipeline;
-	// Sync objs
+	VulkanBuffer m_VertBuffer;
+
 	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
 	VkSemaphore m_ImgAvailableSemas[MAX_FRAMES_IN_FLIGHT], m_RndrFinishedSemas[MAX_FRAMES_IN_FLIGHT];
 
