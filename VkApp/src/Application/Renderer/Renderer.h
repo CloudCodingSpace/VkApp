@@ -31,7 +31,7 @@ private:
 	VulkanCommandPool m_CmdPool;
 	VulkanCmdBuffer m_CmdBuffs[MAX_FRAMES_IN_FLIGHT];
 	VulkanPipeline m_Pipeline;
-	VulkanBuffer m_VertBuffer;
+	VulkanBuffer m_VertBuffer, m_IndexBuffer;
 
 	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
 	VkSemaphore m_ImgAvailableSemas[MAX_FRAMES_IN_FLIGHT], m_RndrFinishedSemas[MAX_FRAMES_IN_FLIGHT];

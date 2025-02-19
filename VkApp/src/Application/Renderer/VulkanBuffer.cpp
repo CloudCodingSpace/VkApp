@@ -19,16 +19,6 @@ void VulkanBuffer::Destroy()
     vkFreeMemory(ctx->device, m_Memory, nullptr);
 }
 
-void VulkanBuffer::MapMem(void** data)
-{
-    vkMapMemory(VkCtxHandler::GetCrntCtx()->device, m_Memory, 0, m_InputData.size, 0, data);
-}
-
-void VulkanBuffer::UnmapMem()
-{
-    vkUnmapMemory(VkCtxHandler::GetCrntCtx()->device, m_Memory);
-}
-
 void VulkanBuffer::BindMem()
 {
     vkBindBufferMemory(VkCtxHandler::GetCrntCtx()->device, m_Handle, m_Memory, 0);
@@ -36,7 +26,9 @@ void VulkanBuffer::BindMem()
 
 void VulkanBuffer::Resize(VulkanBufferInputData inputData)
 {
+    Destroy();
 
+    *this = Create(m_Type, inputData);
 }
 
 VulkanBuffer VulkanBuffer::CreateVertexBuffer(VulkanBufferInputData& inputData)
@@ -70,9 +62,9 @@ VulkanBuffer VulkanBuffer::CreateVertexBuffer(VulkanBufferInputData& inputData)
     staging.BindMem();
 
     void* data;
-    staging.MapMem(&data);
+    vkMapMemory(ctx->device, staging.m_Memory, 0, inputData.size, 0, &data);
     memcpy(data, inputData.data, inputData.size);
-    staging.UnmapMem();
+    vkUnmapMemory(ctx->device, staging.m_Memory);
 
     Copy(&staging, &buffer, inputData.size, 0, 0);
 
@@ -88,7 +80,37 @@ VulkanBuffer VulkanBuffer::CreateIndexBuffer(VulkanBufferInputData& inputData)
     buffer.m_Type = VulkanBufferType::VULKAN_BUFFER_TYPE_INDEX;
     buffer.m_InputData = inputData;
     
-        
+    VkBufferCreateInfo buffInfo{};
+    buffInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffInfo.size = inputData.size;
+    buffInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    buffInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
+    VK_CHECK(vkCreateBuffer(ctx->device, &buffInfo, nullptr, &buffer.m_Handle));
+    
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(ctx->device, buffer.m_Handle, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VK_CHECK(vkAllocateMemory(ctx->device, &allocInfo, nullptr, &buffer.m_Memory))
+
+    buffer.BindMem();
+
+    VulkanBuffer staging = CreateStagingBuffer(inputData);
+    staging.BindMem();
+
+    void* data;
+    vkMapMemory(ctx->device, staging.m_Memory, 0, inputData.size, 0, &data);
+    memcpy(data, inputData.data, inputData.size);
+    vkUnmapMemory(ctx->device, staging.m_Memory);
+
+    Copy(&staging, &buffer, inputData.size, 0, 0);
+
+    staging.Destroy();        
     
     return buffer;
 }

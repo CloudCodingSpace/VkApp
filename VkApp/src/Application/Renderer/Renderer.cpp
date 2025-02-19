@@ -77,7 +77,7 @@ Renderer::Renderer(std::shared_ptr<Window> window)
 
 		m_Pipeline = VulkanPipeline::Create(info);
 	}
-	// Vert Buffer
+	// Vertex & Index Buffer
 	{	
 		Vertex vertices[3];
 		vertices[0].pos = glm::vec3( 0.0f,  0.5f, 0.0f);
@@ -96,6 +96,12 @@ Renderer::Renderer(std::shared_ptr<Window> window)
 		inputData.size = sizeof(vertices[0]) * 3;
 
 		m_VertBuffer = VulkanBuffer::Create(VulkanBufferType::VULKAN_BUFFER_TYPE_VERTEX, inputData);
+	
+		uint32_t indices[3] = { 0, 1, 2 };
+
+		inputData.data = indices;
+		inputData.size = sizeof(indices[0]) * 3;
+		m_IndexBuffer = VulkanBuffer::Create(VulkanBufferType::VULKAN_BUFFER_TYPE_INDEX, inputData);
 	}
 }
 
@@ -107,6 +113,7 @@ Renderer::~Renderer()
 
 	DestroySyncObjs();
 
+	m_IndexBuffer.Destroy();
 	m_VertBuffer.Destroy();
 
 	m_CmdPool.Destroy();
@@ -239,25 +246,30 @@ void Renderer::RecordFrame()
 
 	m_Pipeline.Bind(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
 
-	VkViewport viewport{};
-	viewport.x = 0.0f;
-	viewport.y = (float)m_Ctx.scExtent.height;
-	viewport.width = (float)m_Ctx.scExtent.width;
-	viewport.height = -(float)m_Ctx.scExtent.height;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-	vkCmdSetViewport(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &viewport);
+	{
+		VkViewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = (float)m_Ctx.scExtent.height;
+		viewport.width = (float)m_Ctx.scExtent.width;
+		viewport.height = -(float)m_Ctx.scExtent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &viewport);
+	
+		VkRect2D scissor{};
+		scissor.offset = { 0, 0 };
+		scissor.extent = m_Ctx.scExtent;
+		vkCmdSetScissor(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &scissor);
+	}
 
-	VkRect2D scissor{};
-	scissor.offset = { 0, 0 };
-	scissor.extent = m_Ctx.scExtent;
-	vkCmdSetScissor(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &scissor);
-
-	VkBuffer vertBuff[] = { m_VertBuffer.GetHandle() };
-	VkDeviceSize offsets[] = {0};
-
-	vkCmdBindVertexBuffers(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, vertBuff, offsets);
-	vkCmdDraw(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_VertCount, 1, 0, 0);
+	{
+		VkBuffer vertBuff[] = { m_VertBuffer.GetHandle() };
+		VkDeviceSize offsets[] = {0};
+	
+		vkCmdBindVertexBuffers(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, vertBuff, offsets);
+		vkCmdBindIndexBuffer(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_IndexBuffer.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_VertCount, 1, 0, 0, 0);
+	}
 
 	m_Pass.End(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
 	m_CmdBuffs[m_CurrentFrameIdx].End();

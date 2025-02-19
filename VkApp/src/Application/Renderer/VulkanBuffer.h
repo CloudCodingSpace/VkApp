@@ -23,9 +23,6 @@ public:
     static VulkanBuffer Create(VulkanBufferType type, VulkanBufferInputData& inputData);
     void Destroy();
 
-    void MapMem(void** data);
-    void UnmapMem();    
-
     void BindMem();
 
     void Resize(VulkanBufferInputData inputData);
