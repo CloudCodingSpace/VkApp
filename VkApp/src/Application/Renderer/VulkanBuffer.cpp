@@ -9,6 +9,8 @@ VulkanBuffer VulkanBuffer::Create(VulkanBufferType type, VulkanBufferInputData& 
         return CreateVertexBuffer(inputData);
     if(type == VulkanBufferType::VULKAN_BUFFER_TYPE_INDEX)
         return CreateIndexBuffer(inputData);
+
+    return {};
 }
 
 void VulkanBuffer::Destroy()

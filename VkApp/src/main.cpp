@@ -2,8 +2,8 @@
 
 int main(int argc, const char** argv)
 {
-	std::unique_ptr<Application> app = std::make_unique<Application>();
-	app->Run();
+	Application app;
+	app.Run();
 
 	return 0;
 }

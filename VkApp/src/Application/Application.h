@@ -10,6 +10,6 @@ public:
 
 	void Run();
 private:
-	std::shared_ptr<Window> m_Window;
-	std::shared_ptr<Renderer> m_Renderer;
+	Window m_Window;
+	Renderer m_Renderer;
 };

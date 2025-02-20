@@ -30,5 +30,5 @@ void log_output(log_severity severity, std::string msg)
 
     message += msg;
     printf("%s\n", message.c_str());
-    printf("\033[0;0m"); // Resetting the terminal color
+    printf("\033[0;0m");
 }

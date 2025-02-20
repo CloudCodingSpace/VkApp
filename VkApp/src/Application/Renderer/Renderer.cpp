@@ -4,9 +4,9 @@
 
 #include "Utils.h"
 
-Renderer::Renderer(std::shared_ptr<Window> window)
+Renderer::Renderer(Window& window)
+				: m_Window{window}
 {
-	m_Window = window;
 	m_CurrentFrameIdx = 0;
 
 	// The Ctx
@@ -136,9 +136,9 @@ void Renderer::Render()
 
 void Renderer::Update()
 {
-	if (m_Ctx.scExtent.width != m_Window->GetWidth() || m_Ctx.scExtent.height != m_Window->GetHeight())
+	if (m_Ctx.scExtent.width != m_Window.GetWidth() || m_Ctx.scExtent.height != m_Window.GetHeight())
 	{
-		OnResize(m_Window->GetWidth(), m_Window->GetHeight());
+		OnResize(m_Window.GetWidth(), m_Window.GetHeight());
 	}
 }
 
@@ -155,7 +155,7 @@ void Renderer::BeginFrame()
 	VkResult result = vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSemas[m_CurrentFrameIdx], VK_NULL_HANDLE, &m_CrntImgIdx);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
-		OnResize(m_Window->GetWidth(), m_Window->GetHeight());
+		OnResize(m_Window.GetWidth(), m_Window.GetHeight());
 		return;
 	}
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -212,7 +212,7 @@ void Renderer::EndFrame()
 		VkResult result = vkQueuePresentKHR(m_Ctx.pQueue, &presentInfo);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 		{
-			OnResize(m_Window->GetWidth(), m_Window->GetHeight());
+			OnResize(m_Window.GetWidth(), m_Window.GetHeight());
 			return;
 		}
 		else
@@ -304,7 +304,7 @@ void Renderer::DestroySyncObjs()
 
 void Renderer::OnResize(uint32_t width, uint32_t height)
 {
-	while (m_Window->GetWidth() == 0 || m_Window->GetHeight() == 0) {
+	while (m_Window.GetWidth() == 0 || m_Window.GetHeight() == 0) {
 		glfwWaitEvents();
 	}
 

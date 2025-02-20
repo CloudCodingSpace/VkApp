@@ -116,7 +116,7 @@ static void GetScCaps()
 	}
 }
 
-static void SelectScProps(std::shared_ptr<Window> window)
+static void SelectScProps(Window& window)
 {
 	// Selecting the present mode
 	{
@@ -156,7 +156,7 @@ static void SelectScProps(std::shared_ptr<Window> window)
 		else
 		{
 			int width, height;
-			glfwGetFramebufferSize(window->GetInternHandle(), &width, &height);
+			glfwGetFramebufferSize(window.GetInternHandle(), &width, &height);
 
 			s_Ctx->scExtent = {
 				static_cast<uint32_t>(width),
@@ -169,7 +169,7 @@ static void SelectScProps(std::shared_ptr<Window> window)
 	}
 }
 
-static void CreateSwapchain(std::shared_ptr<Window> window)
+static void CreateSwapchain(Window& window)
 {
 	GetScCaps(); // Retrieving the various surface's rendering capabilities
 	SelectScProps(window); // Selecting the most appropriate present modes, formats, extent for the swapchain
@@ -254,7 +254,7 @@ static void CreateSwapchain(std::shared_ptr<Window> window)
 	}
 }
 
-void VkCtxHandler::InitCtx(std::shared_ptr<Window> window)
+void VkCtxHandler::InitCtx(Window& window)
 {
 	CheckCrntCtx(__func__, __LINE__);
 
@@ -351,7 +351,7 @@ void VkCtxHandler::InitCtx(std::shared_ptr<Window> window)
 
 		// Creating the window surface
 	{
-		VK_CHECK(glfwCreateWindowSurface(s_Ctx->instance, window->GetInternHandle(), nullptr, &s_Ctx->surface))
+		VK_CHECK(glfwCreateWindowSurface(s_Ctx->instance, window.GetInternHandle(), nullptr, &s_Ctx->surface))
 	}
 
 	// Selecting a suitable physical device
@@ -461,7 +461,7 @@ void VkCtxHandler::DestroyCtx()
 	vkDestroyInstance(s_Ctx->instance, nullptr);
 }
 
-void VkCtxHandler::OnResize(std::shared_ptr<Window> window, uint32_t width, uint32_t height)
+void VkCtxHandler::OnResize(Window& window, uint32_t width, uint32_t height)
 {
 	s_Ctx->scImgs.clear();
 	for (const auto& imgView : s_Ctx->scImgViews)

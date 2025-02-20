@@ -7,14 +7,12 @@
 #include "VulkanPipeline.h"
 #include "VulkanBuffer.h"
 
-#include <memory>
-
 #define MAX_FRAMES_IN_FLIGHT 2
 
 class Renderer
 {
 public:
-	Renderer(std::shared_ptr<Window> window);
+	Renderer(Window& window);
 	~Renderer();
 
 	void Render();
@@ -36,7 +34,7 @@ private:
 	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
 	VkSemaphore m_ImgAvailableSemas[MAX_FRAMES_IN_FLIGHT], m_RndrFinishedSemas[MAX_FRAMES_IN_FLIGHT];
 
-	std::shared_ptr<Window> m_Window;
+	Window& m_Window;
 
 private:
 	void BeginFrame();
