@@ -8,6 +8,3 @@
 	path = libs/ImGui
 	url = https://github.com/CloudCodingSpace/ImGui
 	branch = docking
-[submodule "VMA"]
-	path = libs/VMA
-	url = https://github.com/CloudCodingSpace/VMA.git
