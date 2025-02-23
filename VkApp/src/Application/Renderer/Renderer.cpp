@@ -273,7 +273,9 @@ void Renderer::RecordFrame()
 
 	{
 		PushConstData data{};
-		data.Transform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+		data.ViewProj = glm::perspectiveFov(glm::radians(60.0f), (float)m_Window.GetWidth(),(float)m_Window.GetHeight(), 0.1f, 100.0f) 
+							* glm::inverse(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f)));
+		data.Transform = glm::rotate(glm::mat4(1.0f), glm::radians((float)(glfwGetTime() * 5)), glm::vec3(1.0f, 0.0f, 1.0f));
 
 		vkCmdPushConstants(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstData), &data);
 	}
