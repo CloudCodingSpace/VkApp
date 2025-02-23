@@ -10,6 +10,24 @@
 #include <fstream>
 #include <filesystem>
 
+#include "Renderer/VkCtx.h"
+
+#define MAX_UINT16 std::numeric_limits<uint16_t>::max()
+#define MIN_UINT16 std::numeric_limits<uint16_t>::min()
+#define MAX_UINT32 std::numeric_limits<uint32_t>::max()
+#define MIN_UINT32 std::numeric_limits<uint32_t>::min()
+#define MAX_UINT64 std::numeric_limits<uint64_t>::max()
+#define MIN_UINT64 std::numeric_limits<uint64_t>::min()
+
+#define MAX_INT16 std::numeric_limits<int16_t>::max()
+#define MIN_INT16 std::numeric_limits<int16_t>::min()
+#define MAX_INT32 std::numeric_limits<int32_t>::max()
+#define MIN_INT32 std::numeric_limits<int32_t>::min()
+#define MAX_INT64 std::numeric_limits<int64_t>::max()
+#define MIN_INT64 std::numeric_limits<int64_t>::min()
+
+#define INVALID_IDX MAX_UINT32
+
 inline void check_vk_result(VkResult result, uint32_t lineNum, std::string funcName, std::string fileName)
 {
     if (result != VK_SUCCESS)
@@ -42,20 +60,18 @@ inline std::vector<char> ReadFile(std::filesystem::path path)
     return content;
 }
 
+inline uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(VkCtxHandler::GetCrntCtx()->physicalDevice, &memProperties);
+    
+    for(uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+            return i;
+    }
+
+    return INVALID_IDX;
+}
+
 #define VK_CHECK(result) check_vk_result(result, __LINE__, __func__, __FILE__);
-
-#define MAX_UINT16 std::numeric_limits<uint16_t>::max()
-#define MIN_UINT16 std::numeric_limits<uint16_t>::min()
-#define MAX_UINT32 std::numeric_limits<uint32_t>::max()
-#define MIN_UINT32 std::numeric_limits<uint32_t>::min()
-#define MAX_UINT64 std::numeric_limits<uint64_t>::max()
-#define MIN_UINT64 std::numeric_limits<uint64_t>::min()
-
-#define MAX_INT16 std::numeric_limits<int16_t>::max()
-#define MIN_INT16 std::numeric_limits<int16_t>::min()
-#define MAX_INT32 std::numeric_limits<int32_t>::max()
-#define MIN_INT32 std::numeric_limits<int32_t>::min()
-#define MAX_INT64 std::numeric_limits<int64_t>::max()
-#define MIN_INT64 std::numeric_limits<int64_t>::min()
-
-#define INVALID_IDX MAX_UINT32

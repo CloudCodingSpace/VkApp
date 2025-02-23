@@ -9,6 +9,8 @@ VulkanBuffer VulkanBuffer::Create(VulkanBufferType type, VulkanBufferInputData& 
         return CreateVertexBuffer(inputData);
     if(type == VulkanBufferType::VULKAN_BUFFER_TYPE_INDEX)
         return CreateIndexBuffer(inputData);
+    if(type == VulkanBufferType::VULKAN_BUFFER_TYPE_UNIFORM_BUFFER)
+        return CreateUniformBuffer(inputData);
 
     return {};
 }
@@ -24,6 +26,16 @@ void VulkanBuffer::Destroy()
 void VulkanBuffer::BindMem()
 {
     vkBindBufferMemory(VkCtxHandler::GetCrntCtx()->device, m_Handle, m_Memory, 0);
+}
+
+void VulkanBuffer::MapMem()
+{
+    vkMapMemory(VkCtxHandler::GetCrntCtx()->device, m_Memory, 0, m_InputData.size, 0, &m_MappedMem);
+}
+
+void VulkanBuffer::UnmapMem()
+{
+    vkUnmapMemory(VkCtxHandler::GetCrntCtx()->device, m_Memory);
 }
 
 void VulkanBuffer::Resize(VulkanBufferInputData inputData)
@@ -56,6 +68,12 @@ VulkanBuffer VulkanBuffer::CreateVertexBuffer(VulkanBufferInputData& inputData)
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
+    if(allocInfo.memoryTypeIndex == INVALID_IDX)
+    {
+        FATAL("Failed to find suitable memory type index for allocating the buffers!");
+        exit(-1);
+    }
+
     VK_CHECK(vkAllocateMemory(ctx->device, &allocInfo, nullptr, &buffer.m_Memory))
 
     buffer.BindMem();
@@ -63,9 +81,8 @@ VulkanBuffer VulkanBuffer::CreateVertexBuffer(VulkanBufferInputData& inputData)
     VulkanBuffer staging = CreateStagingBuffer(inputData);
     staging.BindMem();
 
-    void* data;
-    vkMapMemory(ctx->device, staging.m_Memory, 0, inputData.size, 0, &data);
-    memcpy(data, inputData.data, inputData.size);
+    vkMapMemory(ctx->device, staging.m_Memory, 0, inputData.size, 0, &staging.m_MappedMem);
+    memcpy(staging.m_MappedMem, inputData.data, inputData.size);
     vkUnmapMemory(ctx->device, staging.m_Memory);
 
     Copy(&staging, &buffer, inputData.size, 0, 0);
@@ -97,6 +114,12 @@ VulkanBuffer VulkanBuffer::CreateIndexBuffer(VulkanBufferInputData& inputData)
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    
+    if(allocInfo.memoryTypeIndex == INVALID_IDX)
+    {
+        FATAL("Failed to find suitable memory type index for allocating the buffers!");
+        exit(-1);
+    }
 
     VK_CHECK(vkAllocateMemory(ctx->device, &allocInfo, nullptr, &buffer.m_Memory))
 
@@ -105,15 +128,50 @@ VulkanBuffer VulkanBuffer::CreateIndexBuffer(VulkanBufferInputData& inputData)
     VulkanBuffer staging = CreateStagingBuffer(inputData);
     staging.BindMem();
 
-    void* data;
-    vkMapMemory(ctx->device, staging.m_Memory, 0, inputData.size, 0, &data);
-    memcpy(data, inputData.data, inputData.size);
+    vkMapMemory(ctx->device, staging.m_Memory, 0, inputData.size, 0, &staging.m_MappedMem);
+    memcpy(staging.m_MappedMem, inputData.data, inputData.size);
     vkUnmapMemory(ctx->device, staging.m_Memory);
 
     Copy(&staging, &buffer, inputData.size, 0, 0);
 
-    staging.Destroy();        
+    staging.Destroy();
     
+    return buffer;
+}
+
+VulkanBuffer VulkanBuffer::CreateUniformBuffer(VulkanBufferInputData& inputData)
+{
+    VkCtx* ctx = VkCtxHandler::GetCrntCtx();
+    VulkanBuffer buffer{};
+    buffer.m_InputData = inputData;
+    buffer.m_Type = VulkanBufferType::VULKAN_BUFFER_TYPE_UNIFORM_BUFFER;
+
+    VkBufferCreateInfo buffInfo{};
+    buffInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffInfo.size = inputData.size;
+    buffInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
+    VK_CHECK(vkCreateBuffer(ctx->device, &buffInfo, nullptr, &buffer.m_Handle));
+    
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(ctx->device, buffer.m_Handle, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    
+    if(allocInfo.memoryTypeIndex == INVALID_IDX)
+    {
+        FATAL("Failed to find suitable memory type index for allocating the buffers!");
+        exit(-1);
+    }
+
+    VK_CHECK(vkAllocateMemory(ctx->device, &allocInfo, nullptr, &buffer.m_Memory))
+
+    buffer.BindMem();
+
     return buffer;
 }
 
@@ -138,6 +196,12 @@ VulkanBuffer VulkanBuffer::CreateStagingBuffer(VulkanBufferInputData& inputData)
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if(allocInfo.memoryTypeIndex == INVALID_IDX)
+    {
+        FATAL("Failed to find suitable memory type index for allocating the buffers!");
+        exit(-1);
+    }
 
     VK_CHECK(vkAllocateMemory(ctx->device, &allocInfo, nullptr, &buffer.m_Memory))
     
@@ -172,18 +236,4 @@ void VulkanBuffer::Copy(VulkanBuffer* src, VulkanBuffer* dst, uint64_t size, uin
     vkQueueWaitIdle(ctx->tQueue);
 
     cmd.Free();
-}
-
-uint32_t VulkanBuffer::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
-{
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(VkCtxHandler::GetCrntCtx()->physicalDevice, &memProperties);
-    
-    for(uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
-    {
-        if((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-            return i;
-    }
-
-    return INVALID_IDX;
 }
