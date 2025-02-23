@@ -4,6 +4,8 @@
 
 #include "Utils.h"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 Renderer::Renderer(Window& window)
 				: m_Window{window}
 {
@@ -64,6 +66,11 @@ Renderer::Renderer(Window& window)
 		attribDescs.push_back(Vertex::GetPosAttribDesc());
 		attribDescs.push_back(Vertex::GetColAttribDesc());
 
+		VkPushConstantRange range{};
+		range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		range.offset = 0;
+		range.size = sizeof(PushConstData);
+
 		VulkanPipelineInfo info;
 		info.type = VulkanPipelineType::VULKAN_PIPELINE_TYPE_GRAPHICS;
 		info.extent = m_Ctx.scExtent;
@@ -74,6 +81,8 @@ Renderer::Renderer(Window& window)
 		info.vertBindings = bindingDescs.data();
 		info.vertAttribCount = attribDescs.size();
 		info.vertAttribs = attribDescs.data();
+		info.pushConstRangeCount = 1;
+		info.pushConstRanges = &range;
 
 		m_Pipeline = VulkanPipeline::Create(info);
 	}
@@ -260,6 +269,13 @@ void Renderer::RecordFrame()
 		scissor.offset = { 0, 0 };
 		scissor.extent = m_Ctx.scExtent;
 		vkCmdSetScissor(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &scissor);
+	}
+
+	{
+		PushConstData data{};
+		data.Transform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+
+		vkCmdPushConstants(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstData), &data);
 	}
 
 	{

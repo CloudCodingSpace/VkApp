@@ -31,7 +31,7 @@ public:
 
     void Resize(VulkanBufferInputData inputData);
     
-    inline void* GetMappedMemPtr() {  }
+    inline void* GetMappedMemPtr() { MapMem(); return m_MappedMem; }
     inline VkBuffer GetHandle() const { return m_Handle; }
     inline VkDeviceMemory GetMemory() const { return m_Memory; }
     inline VulkanBufferType GetType() const { return m_Type; }

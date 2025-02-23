@@ -364,16 +364,16 @@ void VkCtxHandler::InitCtx(Window& window)
 		if (!count)
 			FATAL("Failed to find any device on the current PC!")
 
-			for (auto& device : devices)
-			{
-				bool supported = IsPhysicalDeviceUsable(device);
+		for (auto& device : devices)
+		{
+			bool supported = IsPhysicalDeviceUsable(device);
 
-				if (supported)
-				{
-					s_Ctx->physicalDevice = device;
-					break;
-				}
+			if (supported)
+			{
+				s_Ctx->physicalDevice = device;
+				break;
 			}
+		}
 	}
 
 	// Creating the logical device
