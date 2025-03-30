@@ -7,7 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 Renderer::Renderer(Window& window)
-				: m_Window{window}
+	: m_Window{ window }
 {
 	m_CurrentFrameIdx = 0;
 
@@ -56,6 +56,50 @@ Renderer::Renderer(Window& window)
 			m_CmdBuffs[i] = VulkanCmdBuffer::Allocate(buffData);
 		}
 	}
+	// Descriptor pool
+	{
+		VkDescriptorPoolSize poolSizes[] = {
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 }
+		};
+
+		VkDescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.maxSets = 1000 * (sizeof(poolSizes)/sizeof(poolSizes[0]));
+		poolInfo.poolSizeCount = 2;
+		poolInfo.pPoolSizes = poolSizes;
+		
+		VK_CHECK(vkCreateDescriptorPool(m_Ctx.device, &poolInfo, nullptr, &m_DescPool));
+	}
+	// Descriptor Layout
+	{
+		VkDescriptorSetLayoutBinding bindings[1] = {};
+		bindings[0].binding = 0;
+		bindings[0].descriptorCount = 1;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		VkDescriptorSetLayoutCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		info.bindingCount = sizeof(bindings)/sizeof(bindings[0]);
+		info.pBindings = bindings;
+
+		VK_CHECK(vkCreateDescriptorSetLayout(m_Ctx.device, &info, nullptr, &m_SetLayout));
+	}
+	// Descriptor Sets
+	{
+		VkDescriptorSetLayout layouts[MAX_FRAMES_IN_FLIGHT];
+		for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			layouts[i] = m_SetLayout;
+
+		VkDescriptorSetAllocateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		info.descriptorPool = m_DescPool;
+		info.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+		info.pSetLayouts = layouts;
+		
+		VK_CHECK(vkAllocateDescriptorSets(m_Ctx.device, &info, m_DescSets));
+	}
 	// Pipeline
 	{
 		std::vector<VkVertexInputBindingDescription> bindingDescs;
@@ -83,20 +127,22 @@ Renderer::Renderer(Window& window)
 		info.vertAttribs = attribDescs.data();
 		info.pushConstRangeCount = 1;
 		info.pushConstRanges = &range;
+		info.layoutCount = 1;
+		info.layouts = &m_SetLayout;
 
 		m_Pipeline = VulkanPipeline::Create(info);
 	}
 	// Vertex & Index Buffer
-	{	
+	{
 		Vertex vertices[3];
-		vertices[0].pos = glm::vec3( 0.0f,  0.5f, 0.0f);
-		vertices[1].pos = glm::vec3( 0.5f, -0.5f, 0.0f);
+		vertices[0].pos = glm::vec3(0.0f, 0.5f, 0.0f);
+		vertices[1].pos = glm::vec3(0.5f, -0.5f, 0.0f);
 		vertices[2].pos = glm::vec3(-0.5f, -0.5f, 0.0f);
 
 		vertices[0].col = glm::vec3(1.0f, 0.0f, 0.0f);
 		vertices[1].col = glm::vec3(0.0f, 1.0f, 0.0f);
 		vertices[2].col = glm::vec3(0.0f, 0.0f, 1.0f);
-	
+
 		m_VertCount = 3;
 
 		VulkanBufferInputData inputData{};
@@ -105,12 +151,38 @@ Renderer::Renderer(Window& window)
 		inputData.size = sizeof(vertices[0]) * 3;
 
 		m_VertBuffer = VulkanBuffer::Create(VulkanBufferType::VULKAN_BUFFER_TYPE_VERTEX, inputData);
-	
+
 		uint32_t indices[3] = { 0, 1, 2 };
 
 		inputData.data = indices;
 		inputData.size = sizeof(indices[0]) * 3;
 		m_IndexBuffer = VulkanBuffer::Create(VulkanBufferType::VULKAN_BUFFER_TYPE_INDEX, inputData);
+	}
+	// Texture Image
+	{
+		uint32_t data = 0xffff00ff;
+		m_Image = VulkanImage::Create(1, 1, (unsigned char*)&data, m_CmdPool);
+	}
+	// Updating descriptors
+	{
+		for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			VkDescriptorImageInfo imgInfo{};
+			imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imgInfo.imageView = m_Image.GetViewHandle();
+			imgInfo.sampler = m_Image.GetSamplerHandle();
+
+			VkWriteDescriptorSet writes[1] = {};
+			writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[0].descriptorCount = 1;
+			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[0].dstArrayElement = 0;
+			writes[0].dstBinding = 0;
+			writes[0].dstSet = m_DescSets[i];
+			writes[0].pImageInfo = &imgInfo;
+
+			vkUpdateDescriptorSets(m_Ctx.device, 1, writes, 0, nullptr);
+		}
 	}
 }
 
@@ -121,6 +193,11 @@ Renderer::~Renderer()
 	m_Pipeline.Destroy();
 
 	DestroySyncObjs();
+
+	vkDestroyDescriptorSetLayout(m_Ctx.device, m_SetLayout, nullptr);
+	vkDestroyDescriptorPool(m_Ctx.device, m_DescPool, nullptr);
+
+	m_Image.Destroy();
 
 	m_IndexBuffer.Destroy();
 	m_VertBuffer.Destroy();
@@ -161,7 +238,7 @@ void Renderer::BeginFrame()
 	VK_CHECK(vkWaitForFences(m_Ctx.device, 1, &m_InFlightFences[m_CurrentFrameIdx], VK_TRUE, MAX_UINT64))
 	VK_CHECK(vkResetFences(m_Ctx.device, 1, &m_InFlightFences[m_CurrentFrameIdx]))
 
-	VkResult result = vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSemas[m_CurrentFrameIdx], VK_NULL_HANDLE, &m_CrntImgIdx);
+	VkResult result = vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSemas[m_CurrentFrameIdx], nullptr, &m_CrntImgIdx);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
 		OnResize(m_Window.GetWidth(), m_Window.GetHeight());
@@ -284,6 +361,8 @@ void Renderer::RecordFrame()
 		VkBuffer vertBuff[] = { m_VertBuffer.GetHandle() };
 		VkDeviceSize offsets[] = {0};
 	
+		vkCmdBindDescriptorSets(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_Pipeline.GetBindPoint(), m_Pipeline.GetLayout(), 0, 1, &m_DescSets[m_CurrentFrameIdx], 0, nullptr);
+
 		vkCmdBindVertexBuffers(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, vertBuff, offsets);
 		vkCmdBindIndexBuffer(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_IndexBuffer.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_VertCount, 1, 0, 0, 0);

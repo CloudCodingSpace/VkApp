@@ -232,7 +232,7 @@ void VulkanBuffer::Copy(VulkanBuffer* src, VulkanBuffer* dst, uint64_t size, uin
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = cmdBuffs;
 
-    vkQueueSubmit(ctx->tQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueSubmit(ctx->tQueue, 1, &submitInfo, nullptr);
     vkQueueWaitIdle(ctx->tQueue);
 
     cmd.Free();

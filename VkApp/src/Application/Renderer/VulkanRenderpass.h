@@ -21,5 +21,5 @@ public:
 
 	inline VkRenderPass GetHandle() { return m_Handle; }
 private:
-	VkRenderPass m_Handle = VK_NULL_HANDLE;
+	VkRenderPass m_Handle = nullptr;
 };

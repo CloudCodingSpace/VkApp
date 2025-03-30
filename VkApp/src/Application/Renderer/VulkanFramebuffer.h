@@ -22,6 +22,6 @@ public:
 	inline uint32_t GetHeight() { return m_Height; }
 
 private:
-	VkFramebuffer m_Handle = VK_NULL_HANDLE;
+	VkFramebuffer m_Handle = nullptr;
 	uint32_t m_Width, m_Height;
 };

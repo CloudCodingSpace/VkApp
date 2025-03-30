@@ -40,6 +40,6 @@ public:
     inline VkCommandBuffer GetHandle() const { return m_Handle; }
     inline VulkanCommandPool* GetPool() const { return m_PoolRef; } 
 private:
-    VkCommandBuffer m_Handle = VK_NULL_HANDLE;
+    VkCommandBuffer m_Handle = nullptr;
     VulkanCommandPool* m_PoolRef;
 };

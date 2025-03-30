@@ -141,7 +141,7 @@ static VkPipeline CreateGraphicsPipeline(VulkanPipelineInfo& info, VkPipelineLay
 	gpInfo.layout = layout;
 	gpInfo.subpass = 0;
 	gpInfo.renderPass = info.renderPass;
-	gpInfo.basePipelineHandle = VK_NULL_HANDLE;
+	gpInfo.basePipelineHandle = nullptr;
 	gpInfo.pRasterizationState = &rInfo;
 	gpInfo.pColorBlendState = &colBlendInfo;
 	gpInfo.pDynamicState = &dynamicState;
@@ -152,7 +152,7 @@ static VkPipeline CreateGraphicsPipeline(VulkanPipelineInfo& info, VkPipelineLay
 	gpInfo.stageCount = 2;
 	gpInfo.pStages = stages;
 
-	VK_CHECK(vkCreateGraphicsPipelines(ctx->device, VK_NULL_HANDLE, 1, &gpInfo, nullptr, &pipeline))
+	VK_CHECK(vkCreateGraphicsPipelines(ctx->device, nullptr, 1, &gpInfo, nullptr, &pipeline))
 
 	vkDestroyShaderModule(ctx->device, vertMod, nullptr);
 	vkDestroyShaderModule(ctx->device, fragMod, nullptr);

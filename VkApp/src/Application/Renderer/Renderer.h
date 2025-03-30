@@ -6,6 +6,7 @@
 #include "VulkanCommand.h"
 #include "VulkanPipeline.h"
 #include "VulkanBuffer.h"
+#include "VulkanImage.h"
 
 #define MAX_FRAMES_IN_FLIGHT 2
 
@@ -30,6 +31,11 @@ private:
 	VulkanCmdBuffer m_CmdBuffs[MAX_FRAMES_IN_FLIGHT];
 	VulkanPipeline m_Pipeline;
 	VulkanBuffer m_VertBuffer, m_IndexBuffer;
+	VulkanImage m_Image;
+
+	VkDescriptorSetLayout m_SetLayout = nullptr;
+	VkDescriptorPool m_DescPool = nullptr;
+	VkDescriptorSet m_DescSets[MAX_FRAMES_IN_FLIGHT] = {};
 
 	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
 	VkSemaphore m_ImgAvailableSemas[MAX_FRAMES_IN_FLIGHT], m_RndrFinishedSemas[MAX_FRAMES_IN_FLIGHT];

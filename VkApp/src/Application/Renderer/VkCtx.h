@@ -33,19 +33,19 @@ struct VulkanScCaps
 
 struct VkCtx
 {
-	VkInstance instance = VK_NULL_HANDLE;
-	VkSurfaceKHR surface = VK_NULL_HANDLE;
-	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkInstance instance = nullptr;
+	VkSurfaceKHR surface = nullptr;
+	VkPhysicalDevice physicalDevice = nullptr;
 	VulkanQueueFamilyProps queueProps{};
-	VkQueue gQueue = VK_NULL_HANDLE;
-	VkQueue pQueue = VK_NULL_HANDLE;
-	VkQueue tQueue = VK_NULL_HANDLE;
-	VkDevice device = VK_NULL_HANDLE;
+	VkQueue gQueue = nullptr;
+	VkQueue pQueue = nullptr;
+	VkQueue tQueue = nullptr;
+	VkDevice device = nullptr;
 	VulkanScCaps scCaps{};
 	VkExtent2D scExtent;
 	VkPresentModeKHR scMode;
 	VkSurfaceFormatKHR scFormat;
-	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+	VkSwapchainKHR swapchain = nullptr;
 	std::vector<VkImage> scImgs;
 	std::vector<VkImageView> scImgViews;
 

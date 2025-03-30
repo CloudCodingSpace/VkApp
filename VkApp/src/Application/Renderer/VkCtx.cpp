@@ -196,7 +196,7 @@ static void CreateSwapchain(Window& window)
 		info.imageExtent = s_Ctx->scExtent;
 		info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 		info.clipped = VK_TRUE;
-		info.oldSwapchain = VK_NULL_HANDLE;
+		info.oldSwapchain = nullptr;
 
 		uint32_t familiesIdxs[] = {
 			s_Ctx->queueProps.graphicsQueueIdx,

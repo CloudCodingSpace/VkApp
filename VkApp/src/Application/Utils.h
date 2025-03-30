@@ -75,3 +75,4 @@ inline uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags proper
 }
 
 #define VK_CHECK(result) check_vk_result(result, __LINE__, __func__, __FILE__);
+#define ARR_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
