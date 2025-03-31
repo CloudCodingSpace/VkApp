@@ -6,6 +6,10 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
+
 Renderer::Renderer(Window& window)
 	: m_Window{ window }
 {
@@ -47,6 +51,8 @@ Renderer::Renderer(Window& window)
 		poolData.queueFamily = m_Ctx.queueProps.graphicsQueueIdx;
 		poolData.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		m_CmdPool = VulkanCommandPool::Create(poolData);
+		poolData.flags = 0;
+		m_ImGuiCmdPool = VulkanCommandPool::Create(poolData);
 
 		for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
@@ -58,18 +64,30 @@ Renderer::Renderer(Window& window)
 	}
 	// Descriptor pool
 	{
-		VkDescriptorPoolSize poolSizes[] = {
+		VkDescriptorPoolSize poolSizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 }
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } 
 		};
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.maxSets = 1000 * (sizeof(poolSizes)/sizeof(poolSizes[0]));
+		poolInfo.maxSets = 1000 * ARR_SIZE(poolSizes);
 		poolInfo.poolSizeCount = 2;
 		poolInfo.pPoolSizes = poolSizes;
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 		
 		VK_CHECK(vkCreateDescriptorPool(m_Ctx.device, &poolInfo, nullptr, &m_DescPool));
+		VK_CHECK(vkCreateDescriptorPool(m_Ctx.device, &poolInfo, nullptr, &m_ImGuiDescPool));
 	}
 	// Descriptor Layout
 	{
@@ -184,11 +202,51 @@ Renderer::Renderer(Window& window)
 			vkUpdateDescriptorSets(m_Ctx.device, 1, writes, 0, nullptr);
 		}
 	}
+	// ImGui
+	{
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+
+		ImGui::GetIO().ConfigFlags = ImGuiConfigFlags_ViewportsEnable;
+		
+		ImGui_ImplGlfw_InitForVulkan(m_Window.GetInternHandle(), true);
+
+		ImGui_ImplVulkan_InitInfo info{};
+		info.Allocator = nullptr;
+		info.ApiVersion = VK_API_VERSION_1_0;
+		info.DescriptorPool = m_ImGuiDescPool;
+		info.Device = m_Ctx.device;
+		info.ImageCount = MAX_FRAMES_IN_FLIGHT;
+		info.Instance = m_Ctx.instance;
+		info.MinImageCount = MAX_FRAMES_IN_FLIGHT;
+		info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+		info.PhysicalDevice = m_Ctx.physicalDevice;
+		info.Subpass = 0;
+		info.RenderPass = m_Pass.GetHandle();
+		info.Queue = m_Ctx.gQueue;
+		info.QueueFamily = m_Ctx.queueProps.graphicsQueueIdx;
+
+		ImGui_ImplVulkan_Init(&info);
+
+		VulkanCmdBufferInputData data{};
+		data.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		data.pool = m_CmdPool;
+		VulkanCmdBuffer cmd = VulkanCmdBuffer::Allocate(data);
+		ImGui_ImplVulkan_CreateFontsTexture();
+		cmd.Free();
+	}
 }
 
 Renderer::~Renderer()
 {
 	VkCtxHandler::WaitDeviceIdle();
+
+	// ImGui
+	{
+		ImGui_ImplVulkan_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
+	}
 
 	m_Pipeline.Destroy();
 
@@ -196,12 +254,14 @@ Renderer::~Renderer()
 
 	vkDestroyDescriptorSetLayout(m_Ctx.device, m_SetLayout, nullptr);
 	vkDestroyDescriptorPool(m_Ctx.device, m_DescPool, nullptr);
+	vkDestroyDescriptorPool(m_Ctx.device, m_ImGuiDescPool, nullptr);
 
 	m_Image.Destroy();
 
 	m_IndexBuffer.Destroy();
 	m_VertBuffer.Destroy();
 
+	m_ImGuiCmdPool.Destroy();
 	m_CmdPool.Destroy();
 
 	for (auto& buff : m_Framebuffs)
@@ -218,6 +278,15 @@ void Renderer::Render()
 	RecordFrame();
 	
 	EndFrame();
+}
+
+void Renderer::RenderUI()
+{
+	ImGui::Begin("Gui Window");
+
+	ImGui::Text("Framerate :- %0.3f", ImGui::GetIO().Framerate);
+
+	ImGui::End();
 }
 
 void Renderer::Update()
@@ -367,6 +436,19 @@ void Renderer::RecordFrame()
 		vkCmdBindIndexBuffer(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_IndexBuffer.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_VertCount, 1, 0, 0, 0);
 	}
+
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	RenderUI();
+
+	ImGui::EndFrame();
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), nullptr);
+
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault();
 
 	m_Pass.End(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
 	m_CmdBuffs[m_CurrentFrameIdx].End();

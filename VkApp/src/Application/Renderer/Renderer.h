@@ -17,6 +17,7 @@ public:
 	~Renderer();
 
 	void Render();
+	void RenderUI();
 	void Update();
 
 	void SetClearColor(float r, float g, float b);
@@ -28,13 +29,14 @@ private:
 	VulkanRenderpass m_Pass;
 	std::vector<VulkanFramebuffer> m_Framebuffs;
 	VulkanCommandPool m_CmdPool;
+	VulkanCommandPool m_ImGuiCmdPool;
 	VulkanCmdBuffer m_CmdBuffs[MAX_FRAMES_IN_FLIGHT];
 	VulkanPipeline m_Pipeline;
 	VulkanBuffer m_VertBuffer, m_IndexBuffer;
 	VulkanImage m_Image;
 
 	VkDescriptorSetLayout m_SetLayout = nullptr;
-	VkDescriptorPool m_DescPool = nullptr;
+	VkDescriptorPool m_DescPool = nullptr, m_ImGuiDescPool = nullptr;
 	VkDescriptorSet m_DescSets[MAX_FRAMES_IN_FLIGHT] = {};
 
 	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
