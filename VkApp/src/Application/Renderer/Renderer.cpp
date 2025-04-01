@@ -179,7 +179,7 @@ Renderer::Renderer(Window& window)
 	// Texture Image
 	{
 		uint32_t data = 0xffff00ff;
-		m_Image = VulkanImage::Create(1, 1, (unsigned char*)&data, m_CmdPool);
+		m_Image = VulkanImage::Create(1, 1, (unsigned char*)&data, m_CmdPool, true);
 	}
 	// Updating descriptors
 	{

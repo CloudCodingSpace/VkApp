@@ -7,7 +7,7 @@
 class VulkanImage
 {
 public:
-	static VulkanImage Create(int32_t width, int32_t height, unsigned char* pixels, VulkanCommandPool pool);
+	static VulkanImage Create(int32_t width, int32_t height, unsigned char* pixels, VulkanCommandPool pool, bool hasFrequentUpdates = false);
 	void Destroy();
 
 	inline VkImage GetHandle() { return m_Image; }

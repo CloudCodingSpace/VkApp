@@ -4,7 +4,7 @@
 #include "VulkanBuffer.h"
 #include "Utils.h"
 
-VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pixels, VulkanCommandPool pool)
+VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pixels, VulkanCommandPool pool, bool hasFrequentUpdates)
 {
 	auto* ctx = VkCtxHandler::GetCrntCtx();
 	VulkanImage image{};
@@ -37,24 +37,29 @@ VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pi
 		VkMemoryAllocateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		info.allocationSize = req.size;
-		info.memoryTypeIndex = FindMemoryType(req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		info.memoryTypeIndex = FindMemoryType(req.memoryTypeBits, (!hasFrequentUpdates) ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 		VK_CHECK(vkAllocateMemory(ctx->device, &info, nullptr, &image.m_Memory));
 		vkBindImageMemory(ctx->device, image.m_Image, image.m_Memory, 0);
 	}
 
-	// Staging buffer & copy to image
+	// Staging buffer & copy to image only if it doesn't have frequent updates
 	{
 		VulkanBufferInputData data{};
-		data.pool = pool;
-		data.data = pixels;
-		data.size = width * height * 4 * sizeof(unsigned char);
-		VulkanBuffer staging = VulkanBuffer::CreateStagingBuffer(data);
-		staging.BindMem();
+		VulkanBuffer staging;
 
-		staging.MapMem();
-		memcpy(staging.GetMappedMemPtr(), pixels, data.size);
-		staging.UnmapMem();
+		if (!hasFrequentUpdates)
+		{
+			data.pool = pool;
+			data.data = pixels;
+			data.size = width * height * 4 * sizeof(unsigned char);
+			staging = VulkanBuffer::CreateStagingBuffer(data);
+			staging.BindMem();
+
+			staging.MapMem();
+			memcpy(staging.GetMappedMemPtr(), pixels, data.size);
+			staging.UnmapMem();
+		}
 
 		VulkanCmdBuffer cmd = VulkanCmdBuffer::Allocate({ pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY });
 		cmd.Begin();
@@ -74,10 +79,17 @@ VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pi
 			vkCmdPipelineBarrier(cmd.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, copy_barrier);
 		}
 
-		// Copy
+		if (hasFrequentUpdates)
+		{
+			void* mem = nullptr;
+			vkMapMemory(ctx->device, image.m_Memory, 0, width * height * 4 * sizeof(unsigned char), 0, &mem);
+			memcpy(mem, pixels, width * height * 4 * sizeof(unsigned char));
+			vkUnmapMemory(ctx->device, image.m_Memory);
+		}
+		else
 		{
 			VkBufferImageCopy region{};
-			region.imageOffset = {0, 0, 0};
+			region.imageOffset = { 0, 0, 0 };
 			region.imageSubresource.mipLevel = 0;
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			region.imageSubresource.baseArrayLayer = 0;
@@ -121,7 +133,8 @@ VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pi
 		}
 		cmd.Free();
 
-		staging.Destroy();
+		if(!hasFrequentUpdates)
+			staging.Destroy();
 	}
 
 	// Image view
