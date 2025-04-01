@@ -49,6 +49,8 @@ struct VkCtx
 	std::vector<VkImage> scImgs;
 	std::vector<VkImageView> scImgViews;
 
+	bool vsync = true;
+
 #if defined(_DEBUG) || !defined(NDEBUG)
 	VkDebugUtilsMessengerEXT debugger;
 #endif
@@ -63,7 +65,7 @@ struct VkCtx
 class VkCtxHandler
 {
 public:
-	static void InitCtx(Window& window);
+	static void InitCtx(Window& window, bool vsync = true);
 	static void DestroyCtx();
 
 	static void OnResize(Window& window, uint32_t width, uint32_t height);

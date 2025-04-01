@@ -17,7 +17,7 @@ Renderer::Renderer(Window& window)
 
 	// The Ctx
 	VkCtxHandler::SetCrntCtx(m_Ctx);
-	VkCtxHandler::InitCtx(window);
+	VkCtxHandler::InitCtx(window, false);
 
 	// RndrPass
 	m_Pass = VulkanRenderpass::Create(VULKAN_RP_FLAG_CLEAR_COLOR);
@@ -284,7 +284,7 @@ void Renderer::RenderUI()
 {
 	ImGui::Begin("Gui Window");
 
-	ImGui::Text("Framerate :- %0.3f", ImGui::GetIO().Framerate);
+	ImGui::Text("Framerate :- %0.0f", ImGui::GetIO().Framerate);
 
 	ImGui::End();
 }

@@ -116,7 +116,7 @@ static void GetScCaps()
 	}
 }
 
-static void SelectScProps(Window& window)
+static void SelectScProps(Window& window, bool vsync)
 {
 	// Selecting the present mode
 	{
@@ -132,7 +132,7 @@ static void SelectScProps(Window& window)
 		}
 
 		if (!set)
-			s_Ctx->scMode = VK_PRESENT_MODE_FIFO_KHR;
+			s_Ctx->scMode = (vsync) ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
 	}
 	// Selecting the surface format
 	{
@@ -169,10 +169,10 @@ static void SelectScProps(Window& window)
 	}
 }
 
-static void CreateSwapchain(Window& window)
+static void CreateSwapchain(Window& window, bool vsync)
 {
 	GetScCaps(); // Retrieving the various surface's rendering capabilities
-	SelectScProps(window); // Selecting the most appropriate present modes, formats, extent for the swapchain
+	SelectScProps(window, vsync); // Selecting the most appropriate present modes, formats, extent for the swapchain
 
 	{
 		auto caps = s_Ctx->scCaps.caps;
@@ -254,9 +254,11 @@ static void CreateSwapchain(Window& window)
 	}
 }
 
-void VkCtxHandler::InitCtx(Window& window)
+void VkCtxHandler::InitCtx(Window& window, bool vsync)
 {
 	CheckCrntCtx(__func__, __LINE__);
+
+	s_Ctx->vsync = vsync;
 
 #if defined(_DEBUG) || !defined(NDEBUG)
 
@@ -436,7 +438,7 @@ void VkCtxHandler::InitCtx(Window& window)
 	}
 
 	// Creating the swapchain
-	CreateSwapchain(window);
+	CreateSwapchain(window, vsync);
 }
 
 void VkCtxHandler::DestroyCtx()
@@ -471,7 +473,7 @@ void VkCtxHandler::OnResize(Window& window, uint32_t width, uint32_t height)
 
 	vkDestroySwapchainKHR(s_Ctx->device, s_Ctx->swapchain, nullptr);
 
-	CreateSwapchain(window);
+	CreateSwapchain(window, s_Ctx->vsync);
 }
 
 void VkCtxHandler::SetCrntCtx(VkCtx& ctx)
