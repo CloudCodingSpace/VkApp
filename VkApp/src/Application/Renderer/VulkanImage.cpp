@@ -4,7 +4,7 @@
 #include "VulkanBuffer.h"
 #include "Utils.h"
 
-VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pixels, VulkanCommandPool pool, bool hasFrequentUpdates)
+VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pixels, VulkanCommandPool pool, bool hasFrequentUpdates, bool forColorAttachment)
 {
 	auto* ctx = VkCtxHandler::GetCrntCtx();
 	VulkanImage image{};
@@ -16,14 +16,14 @@ VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pi
 		VkImageCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		info.extent = VkExtent3D{ (uint32_t)width, (uint32_t)height, 1 };
-		info.format = VK_FORMAT_R8G8B8A8_UNORM;
+		info.format = forColorAttachment ? VK_FORMAT_B8G8R8A8_UNORM : VK_FORMAT_R8G8B8A8_UNORM;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		info.arrayLayers = 1;
 		info.imageType = VK_IMAGE_TYPE_2D;
 		info.mipLevels = 1;
 		info.samples = VK_SAMPLE_COUNT_1_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		info.usage = ((forColorAttachment) ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : VK_IMAGE_USAGE_TRANSFER_DST_BIT) | VK_IMAGE_USAGE_SAMPLED_BIT;
 		info.tiling = VK_IMAGE_TILING_OPTIMAL;
 
 		VK_CHECK(vkCreateImage(ctx->device, &info, nullptr, &image.m_Image))
@@ -43,7 +43,7 @@ VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pi
 		vkBindImageMemory(ctx->device, image.m_Image, image.m_Memory, 0);
 	}
 
-	// Staging buffer & copy to image only if it doesn't have frequent updates
+	if(!forColorAttachment)
 	{
 		VulkanBufferInputData data{};
 		VulkanBuffer staging;
@@ -136,13 +136,55 @@ VulkanImage VulkanImage::Create(int32_t width, int32_t height, unsigned char* pi
 		if(!hasFrequentUpdates)
 			staging.Destroy();
 	}
+	else
+	{
+		VulkanCmdBuffer cmd = VulkanCmdBuffer::Allocate({ pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY });
+		cmd.Begin();
+
+		{
+			VkImageMemoryBarrier use_barrier{};
+			use_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			use_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			use_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			use_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			use_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.image = image.m_Image;
+			use_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			use_barrier.subresourceRange.baseMipLevel = 0;
+			use_barrier.subresourceRange.levelCount = 1;
+			use_barrier.subresourceRange.baseArrayLayer = 0;
+			use_barrier.subresourceRange.layerCount = 1;
+
+			vkCmdPipelineBarrier(
+				cmd.GetHandle(),
+				VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				0,
+				0, nullptr, 0, nullptr, 1, &use_barrier
+			);
+
+			cmd.End();
+
+			VkCommandBuffer cmdBuffs[] = { cmd.GetHandle() };
+
+			VkSubmitInfo submitInfo{};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = cmdBuffs;
+
+			vkQueueSubmit(ctx->tQueue, 1, &submitInfo, nullptr);
+			vkQueueWaitIdle(ctx->tQueue);
+		}
+		cmd.Free();
+	}
 
 	// Image view
 	{
 		VkImageViewCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		info.image = image.m_Image;
-		info.format = VK_FORMAT_R8G8B8A8_UNORM;
+		info.format = forColorAttachment ? VK_FORMAT_B8G8R8A8_UNORM : VK_FORMAT_R8G8B8A8_UNORM;
 		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;

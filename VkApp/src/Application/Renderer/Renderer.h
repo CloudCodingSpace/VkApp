@@ -8,6 +8,8 @@
 #include "VulkanBuffer.h"
 #include "VulkanImage.h"
 
+#include <imgui.h>
+
 #define MAX_FRAMES_IN_FLIGHT 2
 
 class Renderer
@@ -31,18 +33,27 @@ private:
 	VulkanCommandPool m_CmdPool;
 	VulkanCommandPool m_ImGuiCmdPool;
 	VulkanCmdBuffer m_CmdBuffs[MAX_FRAMES_IN_FLIGHT];
+	VulkanCmdBuffer m_ViewportCmdBuffs[MAX_FRAMES_IN_FLIGHT];
 	VulkanPipeline m_Pipeline;
 	VulkanBuffer m_VertBuffer, m_IndexBuffer;
 	VulkanImage m_Image;
+
+	std::vector<VulkanImage> m_ViewportImages;
+	std::vector<VulkanFramebuffer> m_ViewportFramebuffers;
+	VkRenderPass m_ViewportPass;
+	std::vector<VkDescriptorSet> m_ViewportImgsDesc;
 
 	VkDescriptorSetLayout m_SetLayout = nullptr;
 	VkDescriptorPool m_DescPool = nullptr, m_ImGuiDescPool = nullptr;
 	VkDescriptorSet m_DescSets[MAX_FRAMES_IN_FLIGHT] = {};
 
 	VkFence m_InFlightFences[MAX_FRAMES_IN_FLIGHT];
+	VkFence m_ViewportInFlightFences[MAX_FRAMES_IN_FLIGHT];
 	VkSemaphore m_ImgAvailableSemas[MAX_FRAMES_IN_FLIGHT], m_RndrFinishedSemas[MAX_FRAMES_IN_FLIGHT];
 
 	Window& m_Window;
+
+	ImVec2 m_ViewportSize;
 
 private:
 	void BeginFrame();

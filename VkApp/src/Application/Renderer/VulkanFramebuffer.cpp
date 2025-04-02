@@ -4,7 +4,7 @@ VulkanFramebuffer VulkanFramebuffer::Create(VulkanFramebufferInputData& data)
 {
 	VulkanFramebuffer buff{};
 	buff.m_Width = data.width;
-	buff.m_Height = data.width;
+	buff.m_Height = data.height;
 
 	{
 		VkCtx* ctx = VkCtxHandler::GetCrntCtx();
@@ -13,7 +13,7 @@ VulkanFramebuffer VulkanFramebuffer::Create(VulkanFramebufferInputData& data)
 		info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		info.attachmentCount = (uint32_t)data.views.size();
 		info.pAttachments = data.views.data();
-		info.renderPass = data.pass.GetHandle();
+		info.renderPass = data.pass;
 		info.layers = 1;
 		info.width = data.width;
 		info.height = data.height;

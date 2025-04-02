@@ -6,9 +6,10 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
+
+#include <iostream>
 
 Renderer::Renderer(Window& window)
 	: m_Window{ window }
@@ -30,7 +31,7 @@ Renderer::Renderer(Window& window)
 		VulkanFramebufferInputData inputData{};
 		inputData.width = m_Ctx.scExtent.width;
 		inputData.height = m_Ctx.scExtent.height;
-		inputData.pass = m_Pass;
+		inputData.pass = m_Pass.GetHandle();
 
 		int i = 0;
 		m_Framebuffs.resize(m_Ctx.scImgViews.size());
@@ -60,6 +61,7 @@ Renderer::Renderer(Window& window)
 			buffData.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 			buffData.pool = m_CmdPool;
 			m_CmdBuffs[i] = VulkanCmdBuffer::Allocate(buffData);
+			m_ViewportCmdBuffs[i] = VulkanCmdBuffer::Allocate(buffData);
 		}
 	}
 	// Descriptor pool
@@ -82,7 +84,7 @@ Renderer::Renderer(Window& window)
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.maxSets = 1000 * ARR_SIZE(poolSizes);
-		poolInfo.poolSizeCount = 2;
+		poolInfo.poolSizeCount = ARR_SIZE(poolSizes);
 		poolInfo.pPoolSizes = poolSizes;
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 		
@@ -118,6 +120,49 @@ Renderer::Renderer(Window& window)
 		
 		VK_CHECK(vkAllocateDescriptorSets(m_Ctx.device, &info, m_DescSets));
 	}
+	// Viewport renderpass
+	{
+		{
+			VkCtx* ctx = VkCtxHandler::GetCrntCtx();
+
+			VkAttachmentDescription colorAttach{};
+			colorAttach.format = ctx->scFormat.format;
+			colorAttach.samples = VK_SAMPLE_COUNT_1_BIT;
+			colorAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			colorAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			colorAttach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			colorAttach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			colorAttach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			colorAttach.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			VkAttachmentReference colorRef{};
+			colorRef.attachment = 0;
+			colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+			VkSubpassDescription subpass{};
+			subpass.colorAttachmentCount = 1;
+			subpass.pColorAttachments = &colorRef;
+
+			VkSubpassDependency spDependency{};
+			spDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+			spDependency.dstSubpass = 0;
+			spDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			spDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			spDependency.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+			spDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+			VkRenderPassCreateInfo info{};
+			info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+			info.attachmentCount = 1;
+			info.pAttachments = &colorAttach;
+			info.subpassCount = 1;
+			info.pSubpasses = &subpass;
+			info.dependencyCount = 1;
+			info.pDependencies = &spDependency;
+
+			VK_CHECK(vkCreateRenderPass(ctx->device, &info, nullptr, &m_ViewportPass));
+		}
+	}
 	// Pipeline
 	{
 		std::vector<VkVertexInputBindingDescription> bindingDescs;
@@ -138,7 +183,7 @@ Renderer::Renderer(Window& window)
 		info.extent = m_Ctx.scExtent;
 		info.vertPath = "assets/shaders/default.vert.spv";
 		info.fragPath = "assets/shaders/default.frag.spv";
-		info.renderPass = m_Pass.GetHandle();
+		info.renderPass = m_ViewportPass;
 		info.vertBindingCount = bindingDescs.size();
 		info.vertBindings = bindingDescs.data();
 		info.vertAttribCount = attribDescs.size();
@@ -208,7 +253,9 @@ Renderer::Renderer(Window& window)
 		ImGui::CreateContext();
 
 		ImGui::GetIO().ConfigFlags = ImGuiConfigFlags_ViewportsEnable;
-		
+		ImGuiStyle& style = ImGui::GetStyle();
+		style.WindowPadding = ImVec2(0, 0);
+
 		ImGui_ImplGlfw_InitForVulkan(m_Window.GetInternHandle(), true);
 
 		ImGui_ImplVulkan_InitInfo info{};
@@ -235,11 +282,48 @@ Renderer::Renderer(Window& window)
 		ImGui_ImplVulkan_CreateFontsTexture();
 		cmd.Free();
 	}
+	// Viewport stuff
+	{
+		m_ViewportSize.x = m_Ctx.scExtent.width;
+		m_ViewportSize.y = m_Ctx.scExtent.height;
+
+		m_ViewportImgsDesc.resize(m_Ctx.scImgs.size());
+		m_ViewportImages.resize(m_Ctx.scImgs.size());
+		m_ViewportFramebuffers.resize(m_Ctx.scImgs.size());
+		for (auto& img : m_ViewportImages)
+			img = VulkanImage::Create(m_Ctx.scExtent.width, m_Ctx.scExtent.height, nullptr, m_CmdPool, false, true);
+
+		for (uint32_t i = 0; i < m_ViewportImages.size(); i++)
+			m_ViewportImgsDesc[i] = ImGui_ImplVulkan_AddTexture(m_ViewportImages[i].GetSamplerHandle(), m_ViewportImages[i].GetViewHandle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	
+		for (uint32_t i = 0; i < m_ViewportFramebuffers.size(); i++)
+		{
+			std::vector<VkImageView> view;
+			view.push_back(m_ViewportImages[i].GetViewHandle());
+
+			VulkanFramebufferInputData data{};
+			data.width = m_ViewportImages[i].GetWidth();
+			data.height = m_ViewportImages[i].GetHeight();
+			data.pass = m_ViewportPass;
+			data.views = view;
+
+			m_ViewportFramebuffers[i] = VulkanFramebuffer::Create(data);
+		}
+	}
 }
 
 Renderer::~Renderer()
 {
 	VkCtxHandler::WaitDeviceIdle();
+
+	// Viewport
+	{
+		for (auto& img : m_ViewportImages)
+			img.Destroy();
+
+		for (auto& fb : m_ViewportFramebuffers)
+			fb.Destroy();
+	}
 
 	// ImGui
 	{
@@ -267,6 +351,7 @@ Renderer::~Renderer()
 	for (auto& buff : m_Framebuffs)
 		buff.Destroy();
 
+	vkDestroyRenderPass(m_Ctx.device, m_ViewportPass, nullptr);
 	m_Pass.Destroy();
 	VkCtxHandler::DestroyCtx();
 }
@@ -282,9 +367,11 @@ void Renderer::Render()
 
 void Renderer::RenderUI()
 {
-	ImGui::Begin("Gui Window");
+	ImGui::Begin("Scene");
 
-	ImGui::Text("Framerate :- %0.0f", ImGui::GetIO().Framerate);
+	m_ViewportSize = ImGui::GetContentRegionAvail();
+
+	ImGui::Image((ImTextureID)m_ViewportImgsDesc[m_CrntImgIdx], ImVec2(m_ViewportFramebuffers[m_CrntImgIdx].GetWidth(), m_ViewportFramebuffers[m_CrntImgIdx].GetHeight()));
 
 	ImGui::End();
 }
@@ -305,7 +392,9 @@ void Renderer::SetClearColor(float r, float g, float b)
 void Renderer::BeginFrame()
 {
 	VK_CHECK(vkWaitForFences(m_Ctx.device, 1, &m_InFlightFences[m_CurrentFrameIdx], VK_TRUE, MAX_UINT64))
+	VK_CHECK(vkWaitForFences(m_Ctx.device, 1, &m_ViewportInFlightFences[m_CurrentFrameIdx], VK_TRUE, MAX_UINT64))
 	VK_CHECK(vkResetFences(m_Ctx.device, 1, &m_InFlightFences[m_CurrentFrameIdx]))
+	VK_CHECK(vkResetFences(m_Ctx.device, 1, &m_ViewportInFlightFences[m_CurrentFrameIdx]))
 
 	VkResult result = vkAcquireNextImageKHR(m_Ctx.device, m_Ctx.swapchain, MAX_UINT64, m_ImgAvailableSemas[m_CurrentFrameIdx], nullptr, &m_CrntImgIdx);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -318,13 +407,72 @@ void Renderer::BeginFrame()
 		std::string msg = "VkResult is " + resultStr;
 		FATAL(msg);
 	}
+
+	// Checking if framebuffer needs to be resized
+	if (m_ViewportFramebuffers[m_CrntImgIdx].GetWidth() != m_ViewportSize.x || m_ViewportFramebuffers[m_CrntImgIdx].GetHeight() != m_ViewportSize.y)
+	{
+		VkCtxHandler::WaitDeviceIdle();
+
+		for (auto& img : m_ViewportImages)
+			img.Destroy();
+
+		for (auto& fb : m_ViewportFramebuffers)
+			fb.Destroy();
+
+		for (auto& desc : m_ViewportImgsDesc)
+			ImGui_ImplVulkan_RemoveTexture(desc);
+
+		m_ViewportImgsDesc.resize(m_Ctx.scImgs.size());
+		m_ViewportImages.resize(m_Ctx.scImgs.size());
+		m_ViewportFramebuffers.resize(m_Ctx.scImgs.size());
+		for (auto& img : m_ViewportImages)
+			img = VulkanImage::Create(m_ViewportSize.x, m_ViewportSize.y, nullptr, m_CmdPool, false, true);
+
+		for (uint32_t i = 0; i < m_ViewportImages.size(); i++)
+			m_ViewportImgsDesc[i] = ImGui_ImplVulkan_AddTexture(m_ViewportImages[i].GetSamplerHandle(), m_ViewportImages[i].GetViewHandle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		for (uint32_t i = 0; i < m_ViewportFramebuffers.size(); i++)
+		{
+			std::vector<VkImageView> view;
+			view.push_back(m_ViewportImages[i].GetViewHandle());
+
+			VulkanFramebufferInputData data{};
+			data.width = m_ViewportImages[i].GetWidth();
+			data.height = m_ViewportImages[i].GetHeight();
+			data.pass = m_ViewportPass;
+			data.views = view;
+
+			m_ViewportFramebuffers[i] = VulkanFramebuffer::Create(data);
+		}
+	}
+
+	m_ViewportCmdBuffs[m_CurrentFrameIdx].Reset();
+	m_ViewportCmdBuffs[m_CurrentFrameIdx].Begin();
+
+	auto& frameBuff = m_ViewportFramebuffers[m_CrntImgIdx];
+
+	VkClearValue clearVal = { {{ 0.1f, 0.1f, 0.1f, 1.0f }} };
+
+	VkRenderPassBeginInfo rpBeginInfo{};
+	rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpBeginInfo.renderPass = m_ViewportPass;
+	rpBeginInfo.framebuffer = frameBuff.GetHandle();
+	rpBeginInfo.renderArea.offset = { 0, 0 };
+	rpBeginInfo.renderArea.extent = { frameBuff.GetWidth(), frameBuff.GetHeight() };
+	rpBeginInfo.clearValueCount = 1;
+	rpBeginInfo.pClearValues = &m_ClearVal;
+
+	m_Pass.Begin(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), rpBeginInfo);
 }
 
 void Renderer::EndFrame()
 {
+	vkCmdEndRenderPass(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle());
+	m_ViewportCmdBuffs[m_CurrentFrameIdx].End();
+
 	// Submit
 	{
-		auto cmdBuffHandle = m_CmdBuffs[m_CurrentFrameIdx].GetHandle();
+		auto cmdBuffHandle = m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle();
 
 		VkSemaphore waitSemas[] = {
 			m_ImgAvailableSemas[m_CurrentFrameIdx]
@@ -349,6 +497,69 @@ void Renderer::EndFrame()
 		submitInfo.pWaitDstStageMask = waitDstFlags;
 
 		VK_CHECK(vkQueueSubmit(m_Ctx.gQueue, 1, &submitInfo, m_InFlightFences[m_CurrentFrameIdx]))
+	}
+
+	m_CmdBuffs[m_CurrentFrameIdx].Reset();
+	m_CmdBuffs[m_CurrentFrameIdx].Begin();
+
+	auto& frameBuff = m_Framebuffs[m_CrntImgIdx];
+
+	VkClearValue clearVal = { {{ 0.1f, 0.1f, 0.1f, 1.0f }} };
+
+	VkRenderPassBeginInfo rpBeginInfo{};
+	rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpBeginInfo.renderPass = m_Pass.GetHandle();
+	rpBeginInfo.framebuffer = frameBuff.GetHandle();
+	rpBeginInfo.renderArea.offset = { 0, 0 };
+	rpBeginInfo.renderArea.extent = m_Ctx.scExtent;
+	rpBeginInfo.clearValueCount = 1;
+	rpBeginInfo.pClearValues = &m_ClearVal;
+
+	m_Pass.Begin(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), rpBeginInfo);
+
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	RenderUI();
+
+	ImGui::EndFrame();
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), nullptr);
+
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault();
+
+	m_Pass.End(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
+	m_CmdBuffs[m_CurrentFrameIdx].End();
+
+	// Submit
+	{
+		auto cmdBuffHandle = m_CmdBuffs[m_CurrentFrameIdx].GetHandle();
+
+		VkSemaphore waitSemas[] = {
+			m_RndrFinishedSemas[m_CurrentFrameIdx]
+		};
+
+		VkSemaphore signalSemas[] = {
+			m_RndrFinishedSemas[m_CurrentFrameIdx]
+		};
+
+		VkPipelineStageFlags waitDstFlags[] = {
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+		};
+
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &cmdBuffHandle;
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = waitSemas;
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = signalSemas;
+		submitInfo.pWaitDstStageMask = waitDstFlags;
+
+		VK_CHECK(vkQueueSubmit(m_Ctx.gQueue, 1, &submitInfo, m_ViewportInFlightFences[m_CurrentFrameIdx]))
 	}
 	// Present
 	{
@@ -381,77 +592,41 @@ void Renderer::EndFrame()
 
 void Renderer::RecordFrame()
 {
-	m_CmdBuffs[m_CurrentFrameIdx].Reset();
-	m_CmdBuffs[m_CurrentFrameIdx].Begin();
+	m_Pipeline.Bind(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle());
 
-	auto& frameBuff = m_Framebuffs[m_CrntImgIdx];
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = (float)m_ViewportFramebuffers[m_CrntImgIdx].GetHeight();
+	viewport.width = (float)m_ViewportFramebuffers[m_CrntImgIdx].GetWidth();
+	viewport.height = -(float)m_ViewportFramebuffers[m_CrntImgIdx].GetHeight();
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &viewport);
 
-	VkClearValue clearVal = {{{ 0.1f, 0.1f, 0.1f, 1.0f }}};
-
-	VkRenderPassBeginInfo rpBeginInfo{};
-	rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	rpBeginInfo.renderPass = m_Pass.GetHandle();
-	rpBeginInfo.framebuffer = frameBuff.GetHandle();
-	rpBeginInfo.renderArea.offset = { 0, 0 };
-	rpBeginInfo.renderArea.extent = m_Ctx.scExtent;
-	rpBeginInfo.clearValueCount = 1;
-	rpBeginInfo.pClearValues = &m_ClearVal;
-
-	m_Pass.Begin(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), rpBeginInfo);
-
-	m_Pipeline.Bind(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
-
-	{
-		VkViewport viewport{};
-		viewport.x = 0.0f;
-		viewport.y = (float)m_Ctx.scExtent.height;
-		viewport.width = (float)m_Ctx.scExtent.width;
-		viewport.height = -(float)m_Ctx.scExtent.height;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-		vkCmdSetViewport(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &viewport);
-	
-		VkRect2D scissor{};
-		scissor.offset = { 0, 0 };
-		scissor.extent = m_Ctx.scExtent;
-		vkCmdSetScissor(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &scissor);
-	}
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = m_Ctx.scExtent;
+	vkCmdSetScissor(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, &scissor);
 
 	{
 		PushConstData data{};
-		data.ViewProj = glm::perspectiveFov(glm::radians(60.0f), (float)m_Window.GetWidth(),(float)m_Window.GetHeight(), 0.1f, 100.0f) 
-							* glm::inverse(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f)));
+		data.ViewProj = glm::perspectiveFov(glm::radians(60.0f), (float)viewport.width, -(float)viewport.height, 0.1f, 100.0f)
+			* glm::inverse(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f)));
 		data.Transform = glm::rotate(glm::mat4(1.0f), glm::radians((float)(glfwGetTime() * 5)), glm::vec3(1.0f, 0.0f, 1.0f));
 
-		vkCmdPushConstants(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstData), &data);
+		vkCmdPushConstants(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstData), &data);
 	}
 
 	{
 		VkBuffer vertBuff[] = { m_VertBuffer.GetHandle() };
-		VkDeviceSize offsets[] = {0};
-	
-		vkCmdBindDescriptorSets(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_Pipeline.GetBindPoint(), m_Pipeline.GetLayout(), 0, 1, &m_DescSets[m_CurrentFrameIdx], 0, nullptr);
+		VkDeviceSize offsets[] = { 0 };
 
-		vkCmdBindVertexBuffers(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, vertBuff, offsets);
-		vkCmdBindIndexBuffer(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_IndexBuffer.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), m_VertCount, 1, 0, 0, 0);
+		vkCmdBindDescriptorSets(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), m_Pipeline.GetBindPoint(), m_Pipeline.GetLayout(), 0, 1, &m_DescSets[m_CurrentFrameIdx], 0, nullptr);
+
+		vkCmdBindVertexBuffers(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), 0, 1, vertBuff, offsets);
+		vkCmdBindIndexBuffer(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), m_IndexBuffer.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(m_ViewportCmdBuffs[m_CurrentFrameIdx].GetHandle(), m_VertCount, 1, 0, 0, 0);
 	}
-
-	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
-
-	RenderUI();
-
-	ImGui::EndFrame();
-	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_CmdBuffs[m_CurrentFrameIdx].GetHandle(), nullptr);
-
-	ImGui::UpdatePlatformWindows();
-	ImGui::RenderPlatformWindowsDefault();
-
-	m_Pass.End(m_CmdBuffs[m_CurrentFrameIdx].GetHandle());
-	m_CmdBuffs[m_CurrentFrameIdx].End();
 }
 
 void Renderer::CreateSyncObjs()
@@ -466,6 +641,7 @@ void Renderer::CreateSyncObjs()
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		VK_CHECK(vkCreateFence(m_Ctx.device, &fenceInfo, nullptr, &m_InFlightFences[i]))
+		VK_CHECK(vkCreateFence(m_Ctx.device, &fenceInfo, nullptr, &m_ViewportInFlightFences[i]))
 		VK_CHECK(vkCreateSemaphore(m_Ctx.device, &semaInfo, nullptr, &m_ImgAvailableSemas[i]))
 		VK_CHECK(vkCreateSemaphore(m_Ctx.device, &semaInfo, nullptr, &m_RndrFinishedSemas[i]))
 	}
@@ -475,6 +651,7 @@ void Renderer::DestroySyncObjs()
 {
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
+		vkDestroyFence(m_Ctx.device, m_ViewportInFlightFences[i], nullptr);
 		vkDestroyFence(m_Ctx.device, m_InFlightFences[i], nullptr);
 		vkDestroySemaphore(m_Ctx.device, m_ImgAvailableSemas[i], nullptr);
 		vkDestroySemaphore(m_Ctx.device, m_RndrFinishedSemas[i], nullptr);
@@ -497,7 +674,7 @@ void Renderer::OnResize(uint32_t width, uint32_t height)
 	VulkanFramebufferInputData inputData{};
 	inputData.width = m_Ctx.scExtent.width;
 	inputData.height = m_Ctx.scExtent.height;
-	inputData.pass = m_Pass;
+	inputData.pass = m_Pass.GetHandle();
 
 	int i = 0;
 	m_Framebuffs.resize(m_Ctx.scImgViews.size());
