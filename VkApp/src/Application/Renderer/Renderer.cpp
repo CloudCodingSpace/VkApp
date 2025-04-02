@@ -376,6 +376,12 @@ void Renderer::RenderUI()
 	ImGui::Image((ImTextureID)m_ViewportImgsDesc[m_CrntImgIdx], ImVec2(m_ViewportFramebuffers[m_CrntImgIdx].GetWidth(), m_ViewportFramebuffers[m_CrntImgIdx].GetHeight()));
 
 	ImGui::End();
+
+	ImGui::Begin("Performance");
+
+	ImGui::Text("FPS :- %0.0f", ImGui::GetIO().Framerate);
+
+	ImGui::End();
 }
 
 void Renderer::Update()
@@ -523,25 +529,9 @@ void Renderer::EndFrame()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// Dockspace window
-	{
-		const ImGuiViewport* viewport = ImGui::GetMainViewport();
-		ImGui::SetNextWindowPos(viewport->WorkPos);
-		ImGui::SetNextWindowSize(viewport->WorkSize);
-		ImGui::SetNextWindowViewport(viewport->ID);
-
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-		ImGui::Begin("DockingSpace Window", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoDocking);
-		ImGui::PopStyleVar(2);
-
-		ImGui::DockSpace(ImGui::GetID("Dockspace"), ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
-		ImGui::SetNextWindowDockID(ImGui::GetID("Dockspace"));
-	}
+	ImGui::DockSpaceOverViewport(ImGui::GetID("Dockspace"), ImGui::GetMainViewport());
 
 	RenderUI();
-
-	ImGui::End(); // Ending the dockspace window
 
 	ImGui::EndFrame();
 	ImGui::Render();
