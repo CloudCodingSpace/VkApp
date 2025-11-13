@@ -381,6 +381,17 @@ void Renderer::RenderUI()
 
 	ImGui::Text("FPS :- %0.0f", ImGui::GetIO().Framerate);
 
+	if (ImGui::BeginMainMenuBar()) {
+		if (ImGui::BeginMenu("File")) {
+			if (ImGui::MenuItem("Exit")) {
+				exit(-1);
+			}
+			ImGui::EndMenu();
+		}
+		
+		ImGui::EndMainMenuBar();
+	}
+
 	ImGui::End();
 }
 
